@@ -1,4 +1,4 @@
-/* Stereograph 0.28a, 21/06/2000;
+/* Stereograph 0.29a, 14/07/2000;
  * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define STEREOGRAPH_VERSION "0.28a"
+#define STEREOGRAPH_VERSION "0.29a"
 
 #include "renderer.h"
 #include "gfxio.h"
@@ -47,8 +47,8 @@ int random_texture_type = TEX_GRAYSCALE;
 
 
 void print_info(void) {
-	printf("SYNOPSIS\n  stereograph [-T n] [OPTIONS] -b [FILE] [-t [FILE]] [-w n]\n              [-o [FILE]] [-f png/ppm/tga] [-l none/back/top]\n\n");
-	printf("OPTIONS\n  -T followed by the number of layers n\n     enables the transparency option\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
+	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga] [-l none/back/top]\n\n");
+	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
 }
 
 
@@ -318,6 +318,11 @@ int parse_args (int argc, char **argv) {
 			switch(argv[z][s]) {
 				case 'b' :
 					if (z < (argc - 1)) {
+						if(!pParam->T_layers && !texture_file_name) {
+							pParam->T_layers = 0;
+							while(argv[z + 2 + pParam->T_layers][0] != '-')
+								pParam->T_layers++;
+						}
 						if(pParam->T_layers) {
 							T_base_file_name = argv + ++z;
 							z += pParam->T_layers;
@@ -330,6 +335,11 @@ int parse_args (int argc, char **argv) {
 					break;
 				case 't' :
 					if (z < (argc - 1)) {
+						if(!pParam->T_layers && !base_file_name) {
+							pParam->T_layers = 0;
+							while(argv[z + 2 + pParam->T_layers][0] != '-')
+								pParam->T_layers++;
+						}
 						if(pParam->T_layers) {
 							T_texture_file_name = argv + ++z;
 							z += pParam->T_layers;
@@ -342,19 +352,6 @@ int parse_args (int argc, char **argv) {
 					break;
 				case 'o' :
 					if (z < (argc - 1)) stereo_file_name = argv[++z]; else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
-					break;
-				/* the following is OBSOLETE and temporary left also under 'F' here for compatibility purpose only */
-				case 'F' :
-					if (z < (argc - 1)) {
-						if(!strcmp(argv[++z], "png"))
-							output_format = GFX_PNG;
-						else if(!strcmp(argv[z], "ppm"))
-							output_format = GFX_PPM;
-						else if(!strcmp(argv[z], "tga"))
-							output_format = GFX_TARGA;
-						else
-							output_format = atoi(argv[z]);
-					} else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
 					break;
 				case 'f' :
 					if (z < (argc - 1)) {
@@ -431,15 +428,6 @@ int parse_args (int argc, char **argv) {
 					pParam->Linear = 0;
 					s++;
 					break;
-				/* the following two parametres are obsolete and only for compatibility temporary intact */
-				/*case 'r' :
-					pParam->AAr = 1;
-					s++;
-					break;
-				case 'l' :
-					pParam->Linear = 0;
-					s++;
-					break;*/
 				case 'A' :
 					pParam->Triangles = 1;
 					s++;
@@ -448,7 +436,9 @@ int parse_args (int argc, char **argv) {
 					verbose = 1;
 					s++;
 					break;
+				/* obsolete, for compatibility purpose, only temporary */
 				case 'T' :
+					fprintf(stderr, "the T option is obsolete, please take a look to the ChangeLog or the README.\n");
 					if(z > 1) { fprintf(stderr, "invalid argument '%c';\nthe T descriptor must PRECEED any argument!\n", argv[z][s]);  return -1; }
 					if (z < (argc - 1)) pParam->T_layers = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
 					break;

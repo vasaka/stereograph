@@ -1,4 +1,4 @@
-Stereograph for linux, an advanced stereogram generator, v0.28a
+Stereograph for linux, an advanced stereogram generator, v0.29a
 (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
 ------------------------------------------------------------------------------
 
@@ -12,8 +12,8 @@ TABLE OF CONTENTS
 1.0 HOW TO INSTALL THIS PACKAGE
 2.0 WHAT DOES STEREOGRAPH
 	2.1 WHY ADVANCED?
-3.0 HOW TO PUT A PRE-STEREOGRAM INTO THE RENDERER
-4.0 OPTIONS
+3.0 RENDERER BASICS
+4.0 REDNERING OPTIONS
 5.0 TRANSPARENCY
 6.0 SINGLE IMAGE STEREOGRAMS BASICS
 
@@ -26,6 +26,8 @@ See INSTALL for a short reference. Since release 0.17 libpng is required.
 There should be no problems if this library is installed under /usr/lib.
 Otherwise please take a look to the Makefile and modify it to suit your
 system.
+
+The current version of Stereograph is available at stereograph.sourceforge.net.
 
 
 2.0 WHAT DOES STEREOGRAPH
@@ -56,10 +58,11 @@ Additionally I expanded the depth detail level of 256 levels to 765. If it
 should be one day necessary to increase this level again, there are no limits to
 extend this range up to 24 bits (16.7 millions) or even more.
 
-To learn how to use all these useful features simply read on. :)
+I was pointed to tiff which supports floating point precision; I am working on
+this issue.
 
 
-3.0 HOW TO PUT A PRE-STEREOGRAM INTO THE RENDERER
+3.0 RENDERER BASICS
 
   -b [base file]
      First of all we begin with a file describing the "relief" of our 3d model.
@@ -102,7 +105,6 @@ To learn how to use all these useful features simply read on. :)
      if no output file is specified stereograph writes the graphics data to
      stdout.
 
-  ** CHANGED SYNOPSIS **
   -f [output format: tga/png/ppm]
      This optional argument let's you choose the output format Stereograph
      should write. Possible values are: "tga" for 24 bit uncompressed TARGA
@@ -112,7 +114,7 @@ To learn how to use all these useful features simply read on. :)
 
 
 
-4.0 OPTIONS
+4.0 REDNERING OPTIONS
 
   Quality controling arguments
 
@@ -234,14 +236,18 @@ define more than one input base file and provide respectively the same number
 of textures. The different bases must have the same dimensions, the textures
 must equal themselves in the width. Otherwise stereograph will complain and
 even not initialize the renderer.
-Rendering transparent stereograms is enabled via the [-T n] flag where n is the
-number of transparent layers. As mentioned above you must provide stereograph
-with n+1 bases and n+1 textures. This option must PRECEED any other options!
+Since release 0.29a transparent rendering needn't to be enabled via the -T
+flag.
 
 Example command line:
 
-> stereograph -T 2 [ADDITIONAL OPTIONS] -b glass0.png glass1.png glass2.png\
+> stereograph [ADDITIONAL OPTIONS] -b glass0.png glass1.png glass2.png\
 	-t tex0.png tex1.png tex2.png -o glass_demo.png
+
+or, running on a sh compatible shell you may simply use
+
+> stereograph [ADDITIONAL OPTIONS] -b $(ls glass?.png) -t $(ls tex?.png)\
+	-o glass_demo.png
 
 At the moment there's no modifier for manipulating the alhpa channels. The
 alphas that may be defined in your png or targa files are ignored.
@@ -255,30 +261,30 @@ First of all, some basic rules.
 As you can see any stereogram is composed of a texture that is repeated n times
 on a horizontal line but not very regularly. There is a simple rule: the more
 complex the scene, the more complex the resulting stereogram appears and the
-more difficulty it becomes for a human being to regard it in all of its three
+more difficulty it becomes for a human being to regard it in its three
 dimensions. The greater the contrast in the scene, the more artefacts are
 produced as by-product of the rendering process and the fact that not every
-pair of pixels on the screen is unequivocal for our brains.
+pair of pixels on the screen is unequivocal for our eyes.
 
-Before we discuss the necessary design properties of the threedimensional scene
-you should know, that the texture design is at least as important as the scene
-design. The more details a texture offers the more details of your scene the
-final stereogram can offer to the spectator.
+Before we discuss the necessary design properties of the three dimensional
+scene you should know, that the texture design is at least as important as the
+design of the scene. The more details a texture offers the more details from
+your scene the final stereogram can offer to the spectator.
 Finally the nicer your texture the more attractive your artwork becomes for the
-people.
+people out there.
 
 There are a lot of ways to produce a useful scene. For your first steps you can
 simply use a graphics program like the GIMP for example. You will learn how to
 use the different depth values as effective as possible. Put some text in your
 scene to test the ability of detail reproduction of your texture. Not every
-text and every font is readable in a stereogram but play with it. Use small
-differences in your scene and try to avoid huge contrasts on the horizontal
-line. On the vertical direction you can do what you want - this behavior won't
-result in any artefacts that attack in your beautiful stereogram.
+text and every font is readable in a stereogram but feel free to play with it!
+Use small differences in your scene and try to avoid huge contrasts on the
+horizontal line. In vertical direction you can do what you want - this behavior
+won't result in any artifacts that may attack your beautiful stereogram.
 
-Artefacts result of symmetric pixel distance constellations that result of
+Artifacts result of symmetric pixel distance constellations that result of
 typical height structures of a scene in combination with a typical texture
 constellation. Some shifting of the texture along x or y, some changes in the
 texture or some adjustments of the eye perspective or of the distance could
-correct them. If nothing helps, alter the width of your texture by one or two
+correct this. If nothing helps, alter the width of your texture by one or two
 pixels, that should be enough.

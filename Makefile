@@ -1,5 +1,5 @@
 #
-# Makefile, Stereograph 0.28a
+# Makefile, Stereograph 0.29a
 #
 # If necessary please edit to suit your system.
 #

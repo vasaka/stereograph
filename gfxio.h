@@ -56,6 +56,7 @@ int Resize_GFX(struct GFX_DATA *gfx, int width);
 /*** gfxio internals ***/
 int identify_GFX_file(FILE *ifile, unsigned char *check_header);
 
+int Read_PPM (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int Read_PNG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int Read_TARGA (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c);

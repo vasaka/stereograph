@@ -1,3 +1,8 @@
+  2000-07-14  * added transparent layer auto sensing which turns
+                the -T flag obsolete;
+              * added ppm reading;
+              * release 0.29a;
+
   2000-06-21  * file format auto sensing implemented;
               * fixed floating point exception in the
 	        random texture generator;

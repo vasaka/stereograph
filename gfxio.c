@@ -1,4 +1,4 @@
-/* Stereograph 0.28a, 21/06/2000;
+/* Stereograph 0.29a, 14/07/2000;
  * Graphics I/O functions;
  * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -20,9 +20,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <png.h>
+#include <ctype.h>
 #include <math.h>
 #include <time.h>
+#include <png.h>
 
 /* uncomment the following line to compile for big endian machines */
 //#define BIG_ENDIAN
@@ -189,6 +190,9 @@ int Read_Gfx_File (char *file_name, struct GFX_DATA *gfx)
 			case GFX_TARGA :
 				a = Read_TARGA(ifile, check_header, gfx);
 				break;
+			case GFX_PPM :
+				a = Read_PPM(ifile, check_header, gfx);
+				break;
 		}
 	}
 
@@ -260,19 +264,90 @@ int Write_Gfx_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 /*** gfxio internals ***/
 int identify_GFX_file(FILE *ifile, unsigned char *check_header) {
 
-	if(fread(check_header, sizeof(char), 8, ifile) != 8) {
+	if(fread(check_header, sizeof(char), 2, ifile) != 2) {
 		if(verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 		fprintf(stderr, "cannot read header! (file corrupt?)\n");
 		return -2;
-	} else {
-	        if(!png_sig_cmp(check_header, 0, 8))
-			return GFX_PNG;
-		else
-			return GFX_TARGA;
+	} else if((check_header[0] == 'P') && ((check_header[1] == '3') || (check_header[1] == '6')))
+		return GFX_PPM;
+	else {
+		if(fread(check_header + 2, sizeof(char), 6, ifile) != 6) {
+			if(verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+			fprintf(stderr, "cannot read header! (file corrupt?)\n");
+			return -2;
+		} else {
+		        if(!png_sig_cmp(check_header, 0, 8))
+				return GFX_PNG;
+			else
+				return GFX_TARGA;
+		}
 	}
 	if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
 	fprintf(stderr, "cannot identify gfx file, unsupported format!\n");
 	return -1;
+}
+
+int skip_space_n_comments(FILE *ifile) {
+	int a;
+	while(isspace(a = fgetc(ifile)) || (a == '#'))
+		if(a == '#')
+			while(fgetc(ifile) != 10);
+	ungetc(a, ifile);
+        return 0;
+}
+
+int get_dec(FILE *ifile) {
+	static int a, c;
+	c = 0;
+	
+	while(isdigit(a = fgetc(ifile)))
+		c = c*10 + (a - '0');
+	ungetc(a, ifile);
+
+	return c;
+}
+
+int Read_PPM (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
+{
+	int a, z, c_max;
+
+	skip_space_n_comments(ifile);
+	gfx->Width = get_dec(ifile);
+	skip_space_n_comments(ifile);
+	gfx->Height = get_dec(ifile);
+
+	gfx->Data = (int*)malloc(gfx->Width*gfx->Height*sizeof(int));
+	if(!gfx->Data) {
+		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+		fprintf(stderr, "error allocating memory for image dimensions of %i * %i pixels in 32 bit\n", gfx->Width, gfx->Height);
+		return -3;
+	}
+
+	skip_space_n_comments(ifile);
+	c_max = 255 / get_dec(ifile);
+
+	if(check_header[1] == '3')
+		for(z = 0; z < (gfx->Width * gfx->Height); z++) {
+			while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
+			gfx->Data[z] = get_dec(ifile) * c_max;
+			while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
+			gfx->Data[z] += (get_dec(ifile) * c_max) * 256;
+			while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
+			gfx->Data[z] += (get_dec(ifile) * c_max) * 65536;
+		}
+	else if (check_header[1] == '6') {
+		while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
+		for(z = 0; z < (gfx->Width * gfx->Height); z++) {
+			gfx->Data[z] = fgetc(ifile) * c_max;
+			gfx->Data[z] += (fgetc(ifile) * c_max) * 256;
+			gfx->Data[z] += (fgetc(ifile) * c_max) * 65536;
+		}
+	} else {
+		if (verbose) printf("FAILED\n");
+		fprintf(stderr, "unknown PPM magic!\n");
+	}
+
+	return 0;
 }
 
 

@@ -1,7 +1,7 @@
 .\"                                      Hey, EMACS: -*- nroff -*-
-.\" $Id: stereograph.1,v 1.1 2000/06/21 22:46:30 janoschs Exp $
+.\" $Id: stereograph.1,v 1.2 2000/07/30 12:14:45 janoschs Exp $
 
-.TH STEREOGRAPH 1 "June 21, 2000"
+.TH STEREOGRAPH 1 "July 14, 2000"
 .\" Please adjust this date whenever revising the manpage.
 
 .SH NAME
@@ -130,14 +130,6 @@ texture.
 .IP "\fB-I\fP"
 inverts a base (non-transparent rendering only)
 
-.IP "\fB-l\fP (\fBnone\fP|\fBback\fP|\fBtop\fP)"
-adjusts the base levels for transparent rendering: the keyword
-\fBnone\fP keeps the defined height levels of the base images,
-\fBback\fP adjusts the bottom area of all upper layers to the level
-defined by the preceding layer and \fBtop\fP adjusts the areas of
-upper layers that are not as far as the preceeding layer to the level
-of the preceding layer.
-
 .IP "\fB-L\fP"
 disables linear rendering.
 
@@ -147,16 +139,21 @@ second line in reversed order to prevent artefacts. This flag should
 be used only with random textures.
 
 .SS "transparancy"
-.IP "\fB-T\fP \fIn\fP"
-enables transparent stereograms where \fIn\fP is the number of
-transparent layers. You must provide stereograph with \fIn\fP+1 bases
-and \fIn\fP+1 textures. This option must PRECEED any other options!
 .IP
 Transparent stereograms are rendered in the same way as normal
 stereograms, the only difference for you is to define more than one
 input base file and provide respectively the same number of
 textures. The different bases must have the same dimensions, the
-textures must equal themselves in the width.
+textures must equal themselves in the width. You may use the \fB-w\fP
+option to let steregraph resize them interactively for you.
+
+.IP "\fB-l\fP (\fBnone\fP|\fBback\fP|\fBtop\fP)"
+adjusts the base levels for transparent rendering: the keyword
+\fBnone\fP keeps the defined height levels of the base images,
+\fBback\fP adjusts the bottom area of all upper layers to the level
+defined by the preceding layer and \fBtop\fP adjusts the areas of
+upper layers that are not as far as the preceeding layer to the level
+of the preceding layer.
 
 
 .\" .SH "BUGS"
@@ -174,4 +171,4 @@ the Debian GNU/Linux system (but may be used by others).
 
 .SH "COMMENT"
 .P
-This manpage documents version 0.28a of \fBstereograph\fP.
+This manpage documents version 0.29a of \fBstereograph\fP.

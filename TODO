@@ -1,4 +1,4 @@
-stereograph 0.31a:
+stereograph 0.32a:
 
 * correct the code to work also for big endian machines; take a look to gfxio.c
 

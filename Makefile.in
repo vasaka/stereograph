@@ -14,12 +14,12 @@ gfxio.o: gfxio.c gfxio.h renderer.h globals.h
 
 
 install:
-	cp stereograph /usr/local/bin/stereograph
-	cp stereograph.1 /usr/local/man/man1/stereograph.1
+	cp stereograph $(PREFIX)/bin/stereograph
+	cp stereograph.1 $(PREFIX)/man/man1/stereograph.1
 
 clean:
-	rm -f $(OBJ0) stereograph core
+	rm -f $(OBJ0) *~ stereograph core
 
 un-install:
-	rm /usr/local/bin/stereograph
-	rm /usr/local/man/man1/stereograph.1
+	rm $(PREFIX)/bin/stereograph
+	rm $(PREFIX)/man/man1/stereograph.1

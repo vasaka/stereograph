@@ -1,5 +1,5 @@
-Stereograph for linux, an advanced stereogram generator, v0.31a
-(c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
+Stereograph for linux, an advanced stereogram generator, v0.32a
+(c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
 ------------------------------------------------------------------------------
 
 Stereograph comes with ABSOLUTELY NO WARRANTY;
@@ -22,8 +22,9 @@ For a VERY short summary of useful arguments ask the executable.
 
 1.0 HOW TO INSTALL THIS PACKAGE
 
-See INSTALL for a short reference. Since release 0.17 libpng is required.
-There should be no problems if this library is installed under /usr/lib.
+See INSTALL for a short reference. Since release 0.17 libpng is required,
+since release 0.32 libjpg is required.
+There should be no problems if these libraries are properly installed.
 Otherwise please take a look to the Makefile and modify it to suit your
 system.
 
@@ -105,7 +106,7 @@ this issue.
      if no output file is specified stereograph writes the graphics data to
      stdout.
 
-  -f [output format: tga/png/ppm]
+  -f [output format: tga/png/ppm/jpg]
      This optional argument let's you choose the output format Stereograph
      should write. Possible values are: "tga" for 24 bit uncompressed TARGA
      ouput, "png" for 32 bit compressed PNG output and finally "ppm" for

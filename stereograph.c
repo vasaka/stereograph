@@ -1,6 +1,6 @@
-/* Stereograph 0.31a, 18/08/2001;
+/* Stereograph 0.32a, 18/10/2003;
  * a stereogram generator;
- * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
+ * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,9 +20,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-
-#define STEREOGRAPH_VERSION "0.31a"
+#define STEREOGRAPH_VERSION "0.32a"
 
 #include "renderer.h"
 #include "gfxio.h"
@@ -289,7 +289,7 @@ void stereograph_param_init(struct STEREOGRAPH_PARAMS *pParams) {
         pParams->Stereo_File_Name = NULL;
         pParams->T_Base_File_Name = NULL;
         pParams->T_Texture_File_Name = NULL;
-        pParams->Output_Format = 0;
+        pParams->Output_Format = GFX_IO_PPM;
 	/* GFX manipulators, generators */
 	pParams->Base_Invert = 0;
 	pParams->T_Base_Level = GFX_T_BACK_LEVEL;
@@ -309,9 +309,10 @@ void stereograph_param_init(struct STEREOGRAPH_PARAMS *pParams) {
 
 
 int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char **argv) {
-	int z, s = 1;
+	int z, s;
 	
-	for(z = 1; z < argc; z++, s = 1)
+	for(z = 1; z < argc; z++) {
+	        s = 1;
 		while((z < argc) && ((argv[z][0] == '-') && (argv[z][s] != '\0')))
 			switch(argv[z][s]) {
 				case 'b' :
@@ -320,7 +321,7 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 						if(!(pParams->Renderer_Params.T_Layers) && !(pParams->Texture_File_Name)) {
 						        /* for transparent rendering first of all the base files must be given */
 							pParams->Renderer_Params.T_Layers = 0;
-							while(argv[z + 2 + (pParams->Renderer_Params.T_Layers)][0] != '-')
+							while(z + 2 + (pParams->Renderer_Params.T_Layers) < argc && argv[z + 2 + (pParams->Renderer_Params.T_Layers)][0] != '-')
 								pParams->Renderer_Params.T_Layers++;
 						}
 						if(pParams->Renderer_Params.T_Layers) {
@@ -363,7 +364,9 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 				case 'f' :
 				        /* get optional file output format */
 					if (z < (argc - 1)) {
-						if(!strcmp(argv[++z], "png"))
+						if(!strcmp(argv[++z], "jpg"))
+							pParams->Output_Format = GFX_IO_JPG;
+					        else if(!strcmp(argv[++z], "png"))
 							pParams->Output_Format = GFX_IO_PNG;
 						else if(!strcmp(argv[z], "ppm"))
 							pParams->Output_Format = GFX_IO_PPM;
@@ -507,13 +510,14 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 					fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
 					return STEREOGRAPH_ERROR;
 			}
+	}
 	return 0;
 }
 
 
 
 void stereograph_print_info(void) {
-	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga] [-l none/back/top]\n\n");
+	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga/jpg] [-l none/back/top]\n\n");
 	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -p front factor                    \n                       -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
 }
 

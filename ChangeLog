@@ -1,3 +1,8 @@
+  2003-10-18    (J.-P. Demailly <demailly@fourier.ujf-grenoble.fr>)
+              * added JPEG support
+	      * corrected bug in stereograph_parse_args() routine;
+	      * release 0.32a;
+  
   2001-08-18  * reorganized data and code structures massively;
 	      * extended code documentation, primarily in the header files;
 	      * no functional changes;

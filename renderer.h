@@ -1,6 +1,6 @@
 /* Stereograph
  * Header file;
- * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
+ * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

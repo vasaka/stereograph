@@ -1,11 +1,12 @@
 #
-# Makefile, Stereograph 0.31a
+# Makefile, Stereograph 0.32a
 #
 # If necessary please edit to suit your system.
 #
 # since release 0.17 libpng is required;
-# if this library is not intalled in /usr/lib
-# please correct the LDFAGS down there.
+# since release 0.32 libjpeg is required;
+#
+# PLEASE adjust the PREFIX if necessary;
 #
 
 
@@ -13,7 +14,8 @@
 CC  = gcc
 CFLAGS = -Wall -O2 -Dlinux
 #CFLAGS = -Wall -O2 -Dlinux -DBIG_ENDIAN
-LDFLAGS = -lm /usr/lib/libpng.so /usr/lib/libz.so
+LDFLAGS = -ljpeg -lpng -lz -lm
+PREFIX = /usr/local
 
 # HPUX
 #CC = cc

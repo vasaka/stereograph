@@ -1,6 +1,6 @@
-/* Stereograph 0.31a, 18/08/2001;
+/* Stereograph 0.32a, 18/10/2003;
  * Graphics I/O functions;
- * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
+ * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,10 +20,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 #include <ctype.h>
 #include <math.h>
 #include <time.h>
 #include <png.h>
+#include <jpeglib.h>
 
 
 #include "renderer.h"
@@ -192,6 +194,9 @@ int GFX_Read_File (char *file_name, struct GFX_DATA *gfx)
 	} else {
 		a = GFX_Identify_File(ifile, check_header);
 		switch (a) {
+			case GFX_IO_JPG :
+				a = GFX_Read_JPG(ifile, check_header, gfx);
+				break;		   
 			case GFX_IO_PNG :
 				a = GFX_Read_PNG(ifile, check_header, gfx);
 				break;
@@ -236,9 +241,12 @@ int GFX_Write_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 		case GFX_IO_TARGA :
 			a = GFX_Write_TARGA(ofile, gfx);
 			break;
+		case GFX_IO_JPG :
+			a = GFX_Write_JPG(ofile, gfx);
+			break;
 		case GFX_IO_PNG :
 			a = GFX_Write_PNG(ofile, gfx);
-			break;
+			break;	   
 		case GFX_IO_PPM :
 			a = GFX_Write_PPM(ofile, gfx);
 			break;
@@ -289,6 +297,11 @@ int GFX_Identify_File(FILE *ifile, unsigned char *check_header) {
 		        if(!png_sig_cmp(check_header, 0, 8))
 				return GFX_IO_PNG;
 			else
+		        if(check_header[0] == 0xff && check_header[1] == 0xd8 &&
+			   (!strncasecmp(check_header+6, "jf", 2) ||
+                            !strncasecmp(check_header+6, "ex", 2)))
+				return GFX_IO_JPG;
+                        else
 				return GFX_IO_TARGA;
 		}
 	}
@@ -319,6 +332,105 @@ int get_dec(FILE *ifile) {
 	return c;
 }
 
+struct error_mgr {
+    struct jpeg_error_mgr pub;	/* "public" fields */
+    jmp_buf setjmp_buffer;	/* for return to caller */
+};
+
+static struct error_mgr jerr;
+typedef struct error_mgr *error_ptr;
+
+/*
+ * Here's the routine that will replace the standard error_exit method:
+ */
+static void
+error_exit(j_common_ptr cinfo)
+{
+    char buf[JMSG_LENGTH_MAX];
+      
+    /* cinfo->err really points to a my_error_mgr struct, so coerce pointer */
+    error_ptr err = (error_ptr) cinfo->err;
+
+    cinfo->err->format_message(cinfo, buf);
+    fprintf(stderr, "%s\n", buf);
+
+    /* Return control to the setjmp point */
+    longjmp(err->setjmp_buffer, 1);
+}
+
+int GFX_Read_JPG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
+{
+    int x, y, z;
+    struct jpeg_decompress_struct cinfo;
+    int row_stride, ncolors;
+    JSAMPROW scanline[1];
+    char *buffer;
+
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = error_exit;
+
+    if (setjmp(jerr.setjmp_buffer)) {
+	/* If we get here, the JPEG code has signaled an error.
+	 * We need to clean up the JPEG object, close the input file,
+	 * and return.
+	 */
+	jpeg_destroy_decompress(&cinfo);
+	return GFX_ERROR_LIBJPG;
+    }
+    jpeg_create_decompress(&cinfo);
+    fseek(ifile, 0, SEEK_SET);
+    jpeg_stdio_src(&cinfo, ifile);
+    jpeg_read_header(&cinfo, TRUE);
+    jpeg_start_decompress(&cinfo);
+
+    gfx->Width = cinfo.output_width;
+    gfx->Height = cinfo.output_height;
+
+    if (cinfo.jpeg_color_space == JCS_GRAYSCALE) {
+	ncolors = cinfo.desired_number_of_colors;
+	row_stride = gfx->Width;
+    } else {
+	row_stride = gfx->Width * 3;
+    }
+
+    buffer = malloc(row_stride);
+    scanline[0] = (JSAMPROW) buffer;
+    gfx->Data = (int*)malloc(gfx->Width*gfx->Height*sizeof(int));
+    if (!buffer || !gfx->Data)
+        return GFX_ERROR_MEMORY_PROBLEM;
+
+    cinfo.quantize_colors = FALSE;
+    z = 0;
+    while (cinfo.output_scanline < gfx->Height) {
+	(void) jpeg_read_scanlines(&cinfo, scanline, (JDIMENSION) 1);
+        y = 0;
+        /* fprintf(stderr, "JPEG : %d\n", cinfo.output_scanline); */
+        if (cinfo.jpeg_color_space == JCS_GRAYSCALE)
+	for(x = 0; x < gfx->Width; x++) {
+	   gfx->Data[z] = buffer[y++] * 65793; /* 65536 + 256 + 1 */
+	   z++;
+	}
+       	else
+	for(x = 0; x < gfx->Width; x++) {
+	   gfx->Data[z] = buffer[y++];
+	   gfx->Data[z] += buffer[y++] << 8;	   
+	   gfx->Data[z] += buffer[y++] << 16;
+	   z++;
+        }
+    }
+    jpeg_finish_decompress(&cinfo);
+    jpeg_destroy_decompress(&cinfo);
+    free(buffer);
+
+    if (jerr.pub.num_warnings > 0) {	/* XXX */
+	fprintf(stderr, "JPEG image may be corrupted\n");
+	longjmp(jerr.setjmp_buffer, 1);
+        return GFX_ERROR_LIBJPG;
+    }
+    return 0;   
+}
+
+   
 int GFX_Read_PPM (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 {
 	int a, z, c_max;
@@ -478,6 +590,71 @@ int GFX_Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx
 		/* that's it */		
 	//}
 	return 0;
+}
+
+int GFX_Write_JPG (FILE *ofile, struct GFX_DATA *gfx)
+{
+    struct jpeg_compress_struct cinfo;
+    int i, z, p, row_stride;
+    JSAMPROW scanline[1];
+    unsigned char *d, *buffer = NULL;
+
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = error_exit;
+
+    if (setjmp(jerr.setjmp_buffer)) {
+	/* If we get here, the JPEG code has signaled an error.
+	 * We need to clean up the JPEG object, close the output file,
+	 * and return.
+	 */
+	jpeg_destroy_compress(&cinfo);
+	return GFX_ERROR_LIBJPG;
+    }
+    jpeg_create_compress(&cinfo);
+    jpeg_stdio_dest(&cinfo, ofile);
+
+    cinfo.image_width = gfx->Width;
+    cinfo.image_height = gfx->Height;
+
+    cinfo.in_color_space = JCS_RGB;
+    cinfo.input_components = 3;
+    buffer = malloc(gfx->Width * 3);
+    if (!buffer)
+        return GFX_ERROR_MEMORY_PROBLEM;
+   
+    jpeg_set_defaults(&cinfo);
+    jpeg_start_compress(&cinfo, TRUE);
+    row_stride = gfx->Width * cinfo.input_components;
+    scanline[0] = buffer;
+    z = 0;
+
+    while (cinfo.next_scanline < cinfo.image_height) {
+	/*
+	 * If we have a greyscale or TrueColor image, just feed
+	 * the raw data to the JPEG routine. Otherwise, we must
+	 * build an array of RGB triples in 'buffer'.
+	 */
+	d = buffer;
+	for (i = 0; i < gfx->Width; ++i) {
+	    p = gfx->Data[z];
+	    z++;
+	    *d++ = p&255;
+	    *d++ = (p>>8)&255;
+	    *d++ = (p>>16)&255;
+        }
+	jpeg_write_scanlines(&cinfo, scanline, (JDIMENSION) 1);
+    }
+    jpeg_finish_compress(&cinfo);
+    jpeg_destroy_compress(&cinfo);
+
+    if (buffer)
+	free(buffer);
+
+    if (jerr.pub.num_warnings > 0) {	/* XXX */
+	fprintf(stderr, "JPEG warning, image may be corrupted\n");
+	longjmp(jerr.setjmp_buffer, 1);
+    }
+    return 0;   
 }
 
 int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx)

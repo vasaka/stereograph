@@ -1,4 +1,4 @@
-/* Stereograph 0.31a, 18/08/2001;
+/* Stereograph 0.32a, 18/08/2001;
  * the renderer, stereographer's engine;
  * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #include "renderer.h"

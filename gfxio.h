@@ -1,6 +1,6 @@
 /* Stereograph
  * Header file;
- * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
+ * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,11 +26,13 @@
 #define GFX_ERROR_UNSUPP_RANDOMTEX -5
 #define GFX_ERROR_UNSUPP_T_LEVEL   -6
 #define GFX_ERROR_LIBPNG           -7
+#define GFX_ERROR_LIBJPG           -8
 
 /* constants for io format definitions */
-#define GFX_IO_PNG   0
-#define GFX_IO_PPM   1
-#define GFX_IO_TARGA 2
+#define GFX_IO_JPG   0
+#define GFX_IO_PNG   1
+#define GFX_IO_PPM   2
+#define GFX_IO_TARGA 3
 
 /* constant types for random textures */
 #define GFX_TEX_BW        0
@@ -68,13 +70,15 @@ int GFX_Resize(struct GFX_DATA *gfx, int width);
 /* gfxio internals */
 int GFX_Identify_File(FILE *ifile, unsigned char *check_header);
 
-int GFX_Read_PPM (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
+int GFX_Read_JPG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_PNG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
+int GFX_Read_PPM (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_TARGA (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c);
 
-int GFX_Write_PPM (FILE *ofile, struct GFX_DATA *gfx);
+int GFX_Write_JPG (FILE *ofile, struct GFX_DATA *gfx);
 int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx);
+int GFX_Write_PPM (FILE *ofile, struct GFX_DATA *gfx);
 int GFX_Write_TARGA (FILE *ofile, struct GFX_DATA *gfx);
 
 int GFX_Generate_SinlineTexture(struct GFX_DATA *gfx);

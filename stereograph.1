@@ -1,5 +1,5 @@
 .\"                                      Hey, EMACS: -*- nroff -*-
-.\" $Id: stereograph.1,v 1.6 2003/10/19 11:46:10 janoschs Exp $
+.\" $Id: stereograph.1,v 1.7 2003/11/16 21:36:42 janoschs Exp $
 .TH STEREOGRAPH 1 "October, 2003"
 .\" Please adjust this date whenever revising the manpage.
 
@@ -16,7 +16,7 @@ stereograph \- stereogram generator
 
 Stereograph is a stereogram generator. In detail it is a single image
 stereogram (SIS) generator. It produces twodimensional images that
-seem to be threedimensional.
+seem to be three-dimensional.
 
 \fIbase\fP is the file describung the \*(rqrelief\*(lq of the 3d
 model. It is a simple graphic where the brightness of a pixel defines
@@ -33,11 +33,11 @@ and it cannot be greater than the distance of a viewer's two eyes -
 otherwise they won't be able to see anything in the stereogram but the
 beautiful great texture. As a hand rule, 100 should work nice for
 stereograms of 640*480 up to 800*600 pixels. Use 110 to 120 for
-bigger ones.
+bigger ones and higher screen resolutions (>=1280*960).
 .P
 The files given as \fIbase\fP and \fItexture\fP must be supplied
-either in the jpg, png, ppm or tga format. Which you used is derived from
-the file name.
+either in the jpg, png, ppm or tga or the C script format.
+Which you used is derived from the file name.
 .P
 \fIoutput\fP is the file where the stereogram is written to. The file
 format to use is deduced from the filename given if not overridden by
@@ -51,6 +51,13 @@ or the format given with \fB-f\fP format to the standard output.
 
 .IP "\fB-v\fP"
 Be verbose.
+
+.IP "\fB-h\fP"
+Show help.
+
+.IP "\fB-I\fP" \fIinclude_dir\fP"
+Set include directory for compilation of C scripts (should point at least
+to the directory where "stereocalls.h" has been copied).
 
 .IP "\fB-f\fP \fIoutputformat\fP"
 \fIoutputformat\fP is one of the following: jpg, png, ppm or jpg.
@@ -130,7 +137,7 @@ texture.
 
 .SS "base options"
 
-.IP "\fB-I\fP"
+.IP "\fB-i\fP"
 inverts a base (non-transparent rendering only)
 
 .IP "\fB-L\fP"
@@ -141,7 +148,7 @@ The anti-artefacts feature tells \fBstereograph\fP to process every
 second line in reversed order to prevent artefacts. This flag should
 be used only with random textures.
 
-.SS "transparancy"
+.SS "transparency"
 .IP
 Transparent stereograms are rendered in the same way as normal
 stereograms, the only difference for you is to define more than one
@@ -164,9 +171,13 @@ of the preceding layer.
 
 .SH "SEE ALSO"
 \fI/usr/share/doc/stereograph/README\fP
+\fI/usr/share/doc/stereograph/README.C\fP
 .SH AUTHOR
 \fBstereograph\fP has been written by Fabian Januszewski
 <fabian.linux@januszewski.de>.
+.P
+\fBC script input\fP has been added by Jean-Pierre Demailly
+<demailly@fourier.ujf-grenoble.fr>.
 .P
 This manual page was written by Peter Palfrader
 <ppalfrad@cosy.sbg.ac.at> using large parts from the README file, for
@@ -174,4 +185,4 @@ the Debian GNU/Linux system (but may be used by others).
 
 .SH "COMMENT"
 .P
-This manpage documents version 0.32a of \fBstereograph\fP.
+This manpage documents version 0.33a of \fBstereograph\fP.

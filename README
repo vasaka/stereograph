@@ -1,4 +1,4 @@
-Stereograph for linux, an advanced stereogram generator, v0.32a
+Stereograph for linux, an advanced stereogram generator, v0.33a
 (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
 ------------------------------------------------------------------------------
 
@@ -20,93 +20,117 @@ TABLE OF CONTENTS
 For a VERY short summary of useful arguments ask the executable.
 
 
+
 1.0 HOW TO INSTALL THIS PACKAGE
 
-See INSTALL for a short reference. Since release 0.17 libpng is required,
-since release 0.32 libjpg is required.
-There should be no problems if these libraries are properly installed.
-Otherwise please take a look to the Makefile and modify it to suit your
-system.
 
-The current version of Stereograph is available at stereograph.sourceforge.net.
+See INSTALL for a short reference.
+
+Since release 0.17 libpng is required,
+since release 0.32 libjpg is required.
+In release 0.33 a rudimentary x11 interface was added.
+
+There should be no problems if these libraries are properly installed.
+Otherwise please take a look to the Makefile and modify it to suit
+your system.
+
+The current version of Stereograph is available at
+stereograph.sourceforge.net.
+
 
 
 2.0 WHAT DOES STEREOGRAPH
 
+
 Stereograph is a stereogram generator. In detail it is a single image
-stereogram (SIS) generator. That's a program that produces twodimensional
-images that seem to be threedimensional (surely you know the famous works of
-"The Magic Eye", Stereograph produces the same output). You do _not_ need
-any pair of colored spectacles to regard them - everyone can learn it.
+stereogram (SIS) generator. That's a program that produces two-
+dimensional images that seem to be three-dimensional (surely you know
+the famous works of "The Magic Eye", Stereograph produces the same
+output). You do _not_ need any pair of colored spectacles to regard
+them - (nearly) everyone can learn it.
 
 
 2.1 WHY ADVANCED?
 
-Yes, that's an interesting question. I know that there are thousands of SIS
-generators available out there. I bought one because I wanted to create
-something special - but I was disappointed when I created my first
-well-prepared composition. The quality was anything but useful. In the third
-dimension (the depth of the image) I was able to see different rough steps
-instead of really smooth transitions as expected. I couldn't believe that. I
-had purchased a professional program that should complete a serious job for me.
-So I took a pencil, a piece of paper and some time to find an optimized way of
-processing stereograms. Stereograph is the result of all my inventions related
-to this this problem. I implemented anti-aliasing for more realistic level
-transitions and to follow exaclty the height structure that is described in the
-base image. I added a zoom feature which has the same effect but is more or less
-not useful for stereograms on a computer screen but interesting for printing.
-Additionally I expanded the depth detail level of 256 levels to 765. If it
-should be one day necessary to increase this level again, there are no limits to
-extend this range up to 24 bits (16.7 millions) or even more.
+Yes, that's an interesting question. I know that there are thousands
+of SIS generators available out there. I bought one because I wanted
+to create something special - but I was disappointed when I created my
+first well-prepared composition. The quality was anything but
+useful. In the third dimension (the depth of the image) I was able to
+see different rough steps instead of really smooth transitions as
+expected. I couldn't believe that. I had purchased a professional
+program that should complete a serious job for me.  So I took a
+pencil, a piece of paper and some time to find an optimized way of
+processing stereograms. Stereograph is the result of all my inventions
+related to this this problem. I implemented anti-aliasing for more
+realistic level transitions and to follow exaclty the height structure
+that is described in the base image. I added a zoom feature which has
+the same effect but is more or less not useful for stereograms on a
+computer screen but interesting for printing.  Additionally I expanded
+the depth detail level of 256 levels to 765. If it should be one day
+necessary to increase this level again, there are no limits to extend
+this range up to 24 bits (16.7 millions) or even more, feel free.
 
-I was pointed to tiff which supports floating point precision; I am working on
-this issue.
 
 
 3.0 RENDERER BASICS
 
+
   -b [base file]
-     First of all we begin with a file describing the "relief" of our 3d model.
-     The base file should contain all information about our object(s). It is a
-     simple graphic where the brightness of a pixel defines its individual
-     depth. The darker a pixel is, the more far away it will seem to be in the
-     final stereogram - the brighter it is, the closer it will be. Usually only
-     gray scale images are used to keep this information. As there are only 256
-     tones I decided to terminate this limitation. Of course, any gray scale
-     image will be enough for a nice stereogram and can be used with
-     stereograph. But if you wanna go for real quality (I mean that quality
-     that is needed when you want to render a realistic tree and put an ant on
-     it) you can use the full bandwidth of 765 levels by using a special color
-     map for rendering (POVRAY does a good job - www.povray.org). Internally
-     the RGB values of each pixel are added to calculate the depth.
+
+     First of all we begin with a file describing the "relief" of our 3d
+     model. The base file should contain all information about our
+     object(s). It is a simple graphic where the brightness of a pixel
+     defines its individual depth. The darker a pixel is, the more far away
+     it will seem to be in the final stereogram - the brighter it is, the
+     closer it will be. Usually only gray scale images are used to keep
+     this information. As there are only 256 tones I decided to eliminiate
+     this limitation. Of course, any gray scale image will be enough for a
+     nice stereogram and can be used with stereograph. But for those that
+     want to create smooth curved surfaces and so on, 256 levels are not
+     sufficient. You should use the full bandwidth of 765 levels by using a
+     special color map for rendering (POVRAY does a good job -
+     www.povray.org). Internally the RGB values of each pixel are added to
+     calculate the depth.
+
+     For mathematically sophisticated individuals, Jean-Pierre Demailly has
+     added the nice feature to compile c scripts on the fly that render a
+     base. Please look at README.C for a quick overview of this feature.
 
   -t [texture file]
-     everybody identifies with a stereogram the beautiful textures that are
-     used to produce themselves. A good texture for a good stereogram needs a
-     lot of love and details and some know-how or enough intuitive feelings to
-     create one. The texture is that what everyone sees when regarding your
-     stereogram - even if he cannot get in the third dimensions of your
-     composition. Without an attractive texture you won't invite attractive
-     visitors for your personal art work. ;)
+
+     Nearly everybody out there identifies with a stereogram the beautiful
+     repetitive textures that are used to produce themselves. A good
+     texture for a good stereogram needs a lot of love and details and some
+     know-how or enough intuitive feelings to create one. The texture is
+     the layer that everyone sees when regarding your stereogram - even if
+     he cannot get in the third dimensions of your composition. Without an
+     attractive texture you won't invite attractive visitors to your
+     personal art work. ;)
+
      Technical note: the width of the texture stands for the maximum depth of
      any steregram and it cannot be greater than the distance of your two
      eyes - otherwise you won't be able to see anything in your stereogram but
      your beautiful great texture. As a hand rule, 100 should work nice for
-     stereograms of 640*480 up to 800*600 pixels. Use 110 to 120 for greater
-     ones.
+     stereograms of 640*480 up to 800*600 pixels at most common screen
+     resolutions. Use 110 to 120 for greater ones.
 
-     Hey, the random texture generator is implemented now! See below near '-w'
+     For a quick look to the depth stereograph provides a  random texture
+     generator. See below near '-w'
 
   -o [output file]
+
      The file where the stereogram is written to. If it exists stereograph
-     won't ask you to allow it to overwrite it, it will simply do it. The
-     following file suffices are recognized by Stereograph: tga, png, ppm;
+     won't ask for permission to overwrite it, it will just do it. The
+     following file suffices are recognized by Stereograph:
+     tga, png, ppm and jpg;
 
      output to stdout
-     if no output file is specified stereograph writes the graphics data to
-     stdout.
+     if no output file is specified stereograph writes the graphics data
+     straight to stdout.
 
   -f [output format: tga/png/ppm/jpg]
+
      This optional argument let's you choose the output format Stereograph
      should write. Possible values are: "tga" for 24 bit uncompressed TARGA
      ouput, "png" for 32 bit compressed PNG output and finally "ppm" for
@@ -247,7 +271,7 @@ even not initialize the renderer.
 Since release 0.29a transparent rendering needn't to be enabled via the -T
 flag.
 
-Example command line:
+Examplecommand line:
 
 > stereograph [ADDITIONAL OPTIONS] -b glass0.png glass1.png glass2.png\
 	-t tex0.png tex1.png tex2.png -o glass_demo.png
@@ -257,8 +281,8 @@ or, running on a sh compatible shell you may simply use
 > stereograph [ADDITIONAL OPTIONS] -b $(ls glass?.png) -t $(ls tex?.png)\
 	-o glass_demo.png
 
-At the moment there's no modifier for manipulating the alhpa channels. The
-alphas that may be defined in your png or targa files are ignored.
+At the moment there's no modifier for manipulating the alpha channels. The
+alphas that may be defined in your png or targa files are ignored for now.
 This feature is ALPHA. Please inform me about your experiences!
 
 

@@ -1,4 +1,4 @@
-/* Stereograph 0.32a, 18/10/2003;
+/* Stereograph 0.33a, 16/11/2003;
  * a stereogram generator;
  * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -22,13 +22,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define STEREOGRAPH_VERSION "0.32a"
+#define STEREOGRAPH_VERSION "0.33a"
 
 #include "renderer.h"
 #include "gfxio.h"
 #include "stereograph.h"
 #include "globals.h"
+#ifndef STEREOGRAPH_ONLY
+#include "../config.h"
+#endif
 
+#ifndef PACKAGE_DATA_DIR
+#define PACKAGE_DATA_DIR "/usr/share/stereograph"
+#endif
 
 
 /* control for the default binary */
@@ -47,7 +53,9 @@ int stereograph_main(int argc, char **argv) {
 
 	stereograph_verbose = 0;
 	stereograph_error = 0;
-
+        stereograph_include_dir = malloc(strlen(PACKAGE_DATA_DIR)+20);
+        sprintf(stereograph_include_dir, "%s/include", PACKAGE_DATA_DIR);
+		
 	stereograph_param_init(&stereograph_params);
 
 	if( (stereograph_error = stereograph_parse_args(&stereograph_params, argc, argv)) ) {
@@ -106,7 +114,7 @@ int stereograph_gfx_prepare(struct STEREOGRAPH_PARAMS *pParams) {
 					        last_error = GFX_Generate_RandomTexture(pParams->GFX_Texture, pParams->Texture_Width_To_Use, pParams->GFX_Base->Height, pParams->Texture_Type);
 					} else {
 					        if(stereograph_verbose) printf("FAILED\n");
-						fprintf(stderr, "Texture_Width_To_Use is too big. This parametre may not be greater than the base width.\n");
+						fprintf(stderr, "Texture_Width_To_Use is too big. This parameter may not be greater than the base width.\n");
 						last_error = STEREOGRAPH_ERROR;
 					}
 				} else {
@@ -155,7 +163,7 @@ int stereograph_gfx_prepare(struct STEREOGRAPH_PARAMS *pParams) {
 
 	} else {
 
-	        /* parametre error */
+	        /* parameter error */
 	        if(!stereograph_verbose) printf("Stereograph for linux Version %s\n", STEREOGRAPH_VERSION);
 		fprintf(stderr, "NOTIFY: must specify at least a base and a texture file\nor define a texture width for a random texture.\nuse the -w option to define a texture width.\nnote that you CANNOT use random textures for transparent rendering.\n\n");
 		stereograph_print_info();
@@ -209,8 +217,8 @@ int stereograph_gfx_process(struct STEREOGRAPH_PARAMS *pParams) {
 
 		if(stereograph_verbose) printf("success;\n");
 
-		/* verbose parametre info */
-		if(stereograph_verbose) printf("using following parametres (zadpexy): %i %i %f %f %f %i %i;\n", pParams->Renderer_Params.Zoom, pParams->Renderer_Params.AA, pParams->Renderer_Params.Distance, pParams->Renderer_Params.Front, pParams->Renderer_Params.Eyeshift, pParams->Renderer_Params.StartX, pParams->Renderer_Params.StartY);
+		/* verbose parameter info */
+		if(stereograph_verbose) printf("using following parameters (zadpexy): %i %i %f %f %f %i %i;\n", pParams->Renderer_Params.Zoom, pParams->Renderer_Params.AA, pParams->Renderer_Params.Distance, pParams->Renderer_Params.Front, pParams->Renderer_Params.Eyeshift, pParams->Renderer_Params.StartX, pParams->Renderer_Params.StartY);
 		if(stereograph_verbose && pParams->Renderer_Params.AAr)
 			printf("anti-artefacts feature enabled;\n");
 		if(stereograph_verbose && !pParams->Renderer_Params.Linear)
@@ -237,7 +245,7 @@ int stereograph_gfx_process(struct STEREOGRAPH_PARAMS *pParams) {
 			fprintf(stderr, "initializing renderer...FAILED;\n");
 		switch (last_error) {
 			case RENDERER_ERROR_INIT_ILLEGAL_PARAMS :
-				fprintf(stderr, "illegal parametre;\n\n");
+				fprintf(stderr, "illegal parameter;\n\n");
 				stereograph_print_info();
 				break;
 			case RENDERER_ERROR_INIT_ILLEGAL_BASE_TEX_RES :
@@ -279,7 +287,7 @@ int stereograph_gfx_process(struct STEREOGRAPH_PARAMS *pParams) {
 }
 
 
-/* fill up parametre list with standard values */
+/* fill up parameter list with standard values */
 void stereograph_param_init(struct STEREOGRAPH_PARAMS *pParams) {
         int z;
 
@@ -289,7 +297,12 @@ void stereograph_param_init(struct STEREOGRAPH_PARAMS *pParams) {
         pParams->Stereo_File_Name = NULL;
         pParams->T_Base_File_Name = NULL;
         pParams->T_Texture_File_Name = NULL;
-        pParams->Output_Format = GFX_IO_PPM;
+   
+#ifdef X11GUI   
+        pParams->Output_Format = GFX_IO_X11;
+#else
+        pParams->Output_Format = GFX_IO_PNG;
+#endif
 	/* GFX manipulators, generators */
 	pParams->Base_Invert = 0;
 	pParams->T_Base_Level = GFX_T_BACK_LEVEL;
@@ -364,13 +377,15 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 				case 'f' :
 				        /* get optional file output format */
 					if (z < (argc - 1)) {
-						if(!strcmp(argv[++z], "jpg"))
+						if(!strcasecmp(argv[++z], "x11"))
+							pParams->Output_Format = GFX_IO_X11;
+						else if(!strcasecmp(argv[z], "jpg"))
 							pParams->Output_Format = GFX_IO_JPG;
-					        else if(!strcmp(argv[++z], "png"))
+					        else if(!strcasecmp(argv[z], "png"))
 							pParams->Output_Format = GFX_IO_PNG;
-						else if(!strcmp(argv[z], "ppm"))
+						else if(!strcasecmp(argv[z], "ppm"))
 							pParams->Output_Format = GFX_IO_PPM;
-						else if(!strcmp(argv[z], "tga"))
+						else if(!strcasecmp(argv[z], "tga"))
 							pParams->Output_Format = GFX_IO_TARGA;
 						else
 							pParams->Output_Format = atoi(argv[z]);
@@ -379,7 +394,17 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 						return STEREOGRAPH_ERROR;
 					}
 					break;
-				case 'x' :
+				case 'I' :
+				        /* get C script include dir */
+					if (z < (argc - 1))
+			     			stereograph_include_dir = argv[++z];
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
+					break;
+
+			 	case 'x' :
 					if (z < (argc - 1))
 					        pParams->Renderer_Params.StartX = atoi(argv[++z]);
 					else {
@@ -457,7 +482,7 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 						fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return STEREOGRAPH_ERROR;
 					}
 					break;
-				case 'I' :
+				case 'i' :
 					pParams->Base_Invert = 1;
 					s++;
 					break;
@@ -505,6 +530,10 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 				        /* print version info */
 					printf("stereograph-%s\n", STEREOGRAPH_VERSION);
 					return STEREOGRAPH_QUIT;
+				case 'h':
+				case 'H':
+			   		stereograph_print_info();
+			   		exit(0);
 				default:
 				        /* default invalid argument message */
 					fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
@@ -517,8 +546,27 @@ int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char *
 
 
 void stereograph_print_info(void) {
-	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga/jpg] [-l none/back/top]\n\n");
-	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -p front factor                    \n                       -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
+	printf("SYNOPSIS\n\
+stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n\
+            [-o [output]] [-f x11/jpg/png/ppm/tga] [-l none/back/top]\n\n");
+	printf("OPTIONS\n\
+\t-a anti-aliasing     -z zoom               (quality)\n\
+\t-d distance          -p front factor                    \n\
+\t-e eye shift                               (perspective)\n\
+\t-x texture insert x  -y texture insert y   (layout)\n\
+\t-w texture width to use\n\
+\t-M/-G/-C generate a monochrome, grayscale or colored\n\
+\t         random background                 (no transparency)\n\
+\t-S generate an experimental random texture (no transparency)\n\
+\t-A add a pair of triangles                 (as an Aid to vision)\n\
+\t-R this flag enables the anti-artefact feature\n\
+\t-L disables the linear rendering algorithm\n\
+\t-l sets the level adjust mode for transparent rendering\n\
+\t-i invert the base\n\
+\t-I defines the include directory path\n\
+\t-f defines the output format\n\
+\t-v verbose mode\n\
+\t-V display version\n\n");
 }
 
 

@@ -19,6 +19,8 @@ install:
 
 clean:
 	rm -f $(OBJ0) *~ stereograph core
+	
+distclean: clean	
 
 un-install:
 	rm $(PREFIX)/bin/stereograph

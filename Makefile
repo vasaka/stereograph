@@ -1,21 +1,23 @@
 #
-# Makefile, Stereograph 0.32a
+# Makefile, Stereograph 0.33a
 #
 # If necessary please edit to suit your system.
 #
 # since release 0.17 libpng is required;
 # since release 0.32 libjpeg is required;
+# since release 0.33 libX11 is required;
 #
-# PLEASE adjust the PREFIX if necessary;
+# if this library is not intalled in /usr/lib
+# please correct the LDFAGS down there.
 #
 
+#PREFIX=/usr/local
+PREFIX=`grep -i "prefix =" ../Makefile | grep -i -v exec | cut -d"=" -f 2`
 
 # Linux
 CC  = gcc
-CFLAGS = -Wall -O2 -Dlinux
-#CFLAGS = -Wall -O2 -Dlinux -DBIG_ENDIAN
-LDFLAGS = -ljpeg -lpng -lz -lm
-PREFIX = /usr/local
+CFLAGS = -Wall -O2 -Dlinux -DSTEREOGRAPH_ONLY -DX11GUI
+LDFLAGS = -ljpeg -lpng -lz -lm -lX11 -ldl -rdynamic -L/usr/X11R6/lib
 
 # HPUX
 #CC = cc

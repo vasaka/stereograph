@@ -29,10 +29,12 @@
 #define GFX_ERROR_LIBJPG           -8
 
 /* constants for io format definitions */
-#define GFX_IO_JPG   0
-#define GFX_IO_PNG   1
-#define GFX_IO_PPM   2
-#define GFX_IO_TARGA 3
+#define GFX_IO_X11   0
+#define GFX_IO_JPG   1
+#define GFX_IO_PNG   2
+#define GFX_IO_PPM   3
+#define GFX_IO_TARGA 4
+#define GFX_IO_C     5
 
 /* constant types for random textures */
 #define GFX_TEX_BW        0
@@ -70,15 +72,21 @@ int GFX_Resize(struct GFX_DATA *gfx, int width);
 /* gfxio internals */
 int GFX_Identify_File(FILE *ifile, unsigned char *check_header);
 
+int GFX_Read_C (FILE *ifile, char *file_name, unsigned char* check_header, struct GFX_DATA *gfx);
+
 int GFX_Read_JPG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_PNG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_PPM (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_TARGA (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
 int GFX_Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c);
 
+int GFX_Write_X11 (FILE *ofile, struct GFX_DATA *gfx);
 int GFX_Write_JPG (FILE *ofile, struct GFX_DATA *gfx);
 int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx);
 int GFX_Write_PPM (FILE *ofile, struct GFX_DATA *gfx);
 int GFX_Write_TARGA (FILE *ofile, struct GFX_DATA *gfx);
 
 int GFX_Generate_SinlineTexture(struct GFX_DATA *gfx);
+
+
+

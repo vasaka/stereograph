@@ -1,4 +1,4 @@
-/* Stereograph 0.32a, 18/10/2003;
+/* Stereograph 0.33a, 16/11/2003;
  * Graphics I/O functions;
  * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -20,21 +20,35 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <ctype.h>
 #include <math.h>
 #include <time.h>
+#include <dlfcn.h>
+#include <endian.h>
+
 #include <png.h>
 #include <jpeglib.h>
 
+#ifdef X11GUI
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
+#include <X11/Xutil.h>
+#include <X11/keysymdef.h>
+#include <X11/keysym.h>
+typedef unsigned long Pixel;
+#endif /* X11GUI */
 
 #include "renderer.h"
 #include "gfxio.h"
 #include "globals.h"
 
-
 #define frand1() ((float)rand() / (float)RAND_MAX)
 #define PI 3.14159265358979
+#define DIRECT 0
+#define AUXIL  1
 
 /* add a pair of triangles to a stereogram */
 int GFX_AddTriangles(int x, int size, int width, struct GFX_DATA *gfx) {
@@ -206,6 +220,9 @@ int GFX_Read_File (char *file_name, struct GFX_DATA *gfx)
 			case GFX_IO_PPM :
 				a = GFX_Read_PPM(ifile, check_header, gfx);
 				break;
+			case GFX_IO_C :
+				a = GFX_Read_C(ifile, file_name, check_header, gfx);
+				break;		   
 		}
 	}
 
@@ -223,7 +240,6 @@ int GFX_Write_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 	int a;
 	FILE *ofile = NULL;
 
-
 	if(stereograph_verbose) printf("saving '%s' (%i*%i)...", file_name, gfx->Width, gfx->Height);
 
 	if(!file_name)
@@ -238,6 +254,11 @@ int GFX_Write_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 	} else
 
 	switch (output_format) {
+#ifdef X11GUI	   
+	        case GFX_IO_X11 :
+		        a = GFX_Write_X11(ofile, gfx);
+			break;
+#endif /* X11GUI */	   
 		case GFX_IO_TARGA :
 			a = GFX_Write_TARGA(ofile, gfx);
 			break;
@@ -288,6 +309,8 @@ int GFX_Identify_File(FILE *ifile, unsigned char *check_header) {
 		return GFX_ERROR_READ_ERROR;
 	} else if((check_header[0] == 'P') && ((check_header[1] == '3') || (check_header[1] == '6')))
 		return GFX_IO_PPM;
+        else if((check_header[0] == '/') && ((check_header[1] == '*')))
+		return GFX_IO_C;					     
 	else {
 		if(fread(check_header + 2, sizeof(char), 6, ifile) != 6) {
 			if(stereograph_verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
@@ -330,6 +353,332 @@ int get_dec(FILE *ifile) {
 	ungetc(a, ifile);
 
 	return c;
+}
+
+typedef double point[3];
+typedef void (*BFunction)();
+typedef double (*ZFunction)(double x, double y);
+typedef void  (*PFunction)(point p, double x, double y);
+
+double CONV_RAD=M_PI/180;
+
+int color_range=765;
+int auxil=DIRECT;
+
+int width=0, height=0;
+int *pixel_color = NULL;
+struct GFX_DATA *global_gfx;
+double X1=-1.0, X2=1.0, Y1=-1.0, Y2=1.0, Z1=-1.0, Z2=1.0;
+double ratio_x=1.0, ratio_y=1.0, ratio_z=1.0;
+double m_rot[12]={1,0,0,0,0,1,0,0,0,0,1,0};
+
+double max(double x, double y)
+{
+   if(x>=y) return x; else return y;
+}
+
+double min(double x, double y)
+{
+   if(x>=y) return x; else return y;
+}
+
+void init_graphic_window(int w, int h, int mode)
+{
+     int s;
+
+     width = w;
+     height = h;
+     auxil = mode;
+     s = width * height * sizeof(int);
+      
+     global_gfx->Width = width;
+     global_gfx->Height = height;
+     global_gfx->Data = (int*)malloc(s);
+     memset(global_gfx->Data, 0, s);
+   
+     if (auxil) {
+	 pixel_color = (int *)malloc(s);
+         memset(pixel_color, 0, s);
+     } else
+         pixel_color = global_gfx->Data;
+}
+
+void translation(double a, double b, double c)
+{
+   m_rot[3] = a;   
+   m_rot[7] = b;   
+   m_rot[11] = c;   
+}
+
+void scale(double a)
+{
+int i;
+
+   for (i=0; i<=11; i++) m_rot[i] *= a;   
+}
+
+void rotation_angles(double theta, double phi, double psi)
+{
+double ca,cb,cc, sa,sb,sc;
+
+   ca=theta*CONV_RAD;
+   cb=phi*CONV_RAD;
+   cc=psi*CONV_RAD;
+
+   sa=sin(ca); ca=cos(ca);
+   sb=sin(cb); cb=cos(cb);
+   sc=sin(cc); cc=cos(cc);
+
+   m_rot[0] = ca*cb;
+   m_rot[1] = -sa*cc-ca*sb*sc;
+   m_rot[2] = sa*sc-ca*sb*cc;
+
+   m_rot[4] = sa*cb;
+   m_rot[5] = ca*cc-sa*sb*sc;
+   m_rot[6] = -ca*sc-sa*sb*cc;
+
+   m_rot[8] = sb;
+   m_rot[9] = cb*sc;
+   m_rot[10]= cb*cc;
+
+}
+
+void rotate(point p, point q)
+{
+int i,j;
+   for(i=0; i<=2; i++)
+     {
+     j=4*i;
+     q[i] = m_rot[j]*p[0]+m_rot[j+1]*p[1]+m_rot[j+2]*p[2]+m_rot[j+3];
+     }
+}
+
+void mesh(point *p, int h, int i, int j)
+{
+point a[3];
+double ca,cb,cc,cd, delta, s,t, adds,addt, x, y, z0,z1,z2;
+int u1, u2, v1, v2;
+int k,l,m;
+
+   rotate(p[h],a[0]);
+   rotate(p[i],a[1]);
+   rotate(p[j],a[2]);
+
+   u1=width; u2=-1;
+   v1=height; v2=-1;
+
+   for(k=0; k<=2; k++)
+     {
+     l=(int)((a[k][0]-X1)/ratio_x);
+     if(l<u1) u1=l;
+     if(l>u2) u2=l;
+     l=(int)((Y2-a[k][1])/ratio_y);
+     if(l<v1) v1=l;
+     if(l>v2) v2=l;
+     }
+
+    if(u1<0) u1=0;
+    if(u2>=width) u2=width-1;
+    if(v1<0) v1=0;
+    if(v2>=height) v2=height-1;
+    if(u1>u2 || v1>v2) return;
+
+    z0 = a[0][2];
+    z1 = a[1][2]-z0;
+    z2 = a[2][2]-z0;
+
+    z0 = (z0-Z1)*ratio_z;
+    z1 = z1*ratio_z;
+    z2 = z2*ratio_z;
+
+    delta = (a[1][0]-a[0][0])*(a[2][1]-a[0][1]) 
+                      - (a[1][1]-a[0][1])*(a[2][0]-a[0][0]);
+    if (fabs(delta)<1E-5) return;
+    
+    delta=1/delta;
+    ca = (a[2][1]-a[0][1])*delta;
+    cb = (a[0][0]-a[2][0])*delta;
+    cc = (a[0][1]-a[1][1])*delta;
+    cd = (a[1][0]-a[0][0])*delta;
+    adds = ca*ratio_x;
+    addt = cc*ratio_x;
+
+    for(l=v1; l<=v2; l++) 
+      {
+      x = X1 + u1*ratio_x - a[0][0];
+      y = Y2 - l*ratio_y - a[0][1];
+      s = ca*x + cb*y;
+      t = cc*x + cd*y;
+      for(k=u1; k<=u2; k++)
+	{
+        if (s>=-0.0001 && t>=-0.0001 && s+t<=1.0001)
+	  {
+          m = (int) (z0 + s*z1 + t*z2);
+          if (m<0) m=0;
+          if (m>color_range) m=color_range;
+          if (m>pixel_color[k+l*width]) pixel_color[k+l*width] = m;
+	  }
+        s = s + adds;
+        t = t + addt;
+        }
+      }
+}
+
+extern void put_pixel(int x, int y, int r, int g, int b)
+{
+	pixel_color[x+y*width] = r + (g<<8) + (b<<16);
+}
+
+void build(BFunction bfunct)
+{
+   bfunct();
+}
+
+void light(ZFunction zfunct)
+{
+int i, j;
+int k;
+double x,y;
+
+   for(j=0; j<height; j++) 
+   {
+     y = Y2-ratio_y*j;
+     for(i=0; i<width; i++)
+     {
+        x = ratio_x*i+X1;
+        k = (int)((zfunct(x,y)-Z1)*ratio_z);
+        if (k<0) k=0;
+        if (k>color_range) k=color_range;
+        if (k>pixel_color[i+j*width]) pixel_color[i+j*width] = k;
+     }
+   }
+}
+
+void graph(PFunction pfunct, double xi, double xs, int nx, 
+                             double yi, double ys, int ny)
+{
+int i, j, l;
+double hx,hy;
+point p[4];
+
+   if(nx<=0 || ny<=0) return;
+
+   hx = (xs-xi)/nx;
+   hy = (ys-yi)/ny;
+
+   for(j=0; j<ny; j++) 
+     {
+     for(l=0; l<=1; l++)
+         pfunct(p[l],xi,yi+(j+l)*hy);
+
+     for(i=1; i<=nx; i++)
+         {
+	 memcpy(p[2], p[0], sizeof(point));
+         memcpy(p[3], p[1], sizeof(point)); 
+         for(l=0; l<=1; l++)
+            pfunct(p[l], xi+i*hx,yi+(j+l)*hy);
+         mesh(p,0,1,2); mesh(p,1,2,3);
+         }
+     }
+}
+
+void set_range(char c, double u1, double u2)
+{
+     if (width == 0 || height == 0) {
+	fprintf(stderr, "init_graphic_window() should be used first !!\n");
+	return;
+     }
+   
+     if (c == 'x') {
+	X1 = u1;
+   	X2 = u2;
+        ratio_x = (X2-X1)/(double)width;
+        if (ratio_x == 0)
+	    fprintf(stderr, "Values x1=%g, x2=%g invalid\n", X1, X2);
+     } else
+     if (c == 'y') {
+	Y1 = u1;
+   	Y2 = u2;
+        ratio_y = (Y2-Y1)/(double)height;
+        if (ratio_y == 0)
+	    fprintf(stderr, "Values y1=%g, y2=%g invalid\n", Y1, Y2);
+     } else
+     if (c == 'z') {
+	Z1 = u1;
+   	Z2 = u2;
+        ratio_z = Z2-Z1;
+        if (ratio_z<=0)
+	    fprintf(stderr, "Values z1=%g, z2=%g invalid\n", Z1, Z2);	
+        else 
+            ratio_z = ((double)color_range)/ratio_z;
+     }   
+}
+
+void set_grey_levels()
+{
+    int x, y, k, p;
+   
+    for (y=0; y<height; y++)
+    for (x=0; x<width; x++) {
+        k = x + y*width;
+        p = pixel_color[k];
+        if (p)
+            global_gfx->Data[k] = (p/3) + (((p+1)/3)<<8) + (((p+2)/3)<<16);
+    }
+}
+
+void set_color_levels()
+{
+    if (!auxil) return;
+    memcpy(global_gfx->Data, pixel_color, width*height*sizeof(int));
+}
+
+
+int GFX_Read_C (FILE *ifile, char *file_name, unsigned char *check_header, struct GFX_DATA *gfx)
+{
+    void *dl_handle = NULL;
+    void *(* iproc)();
+    char *ptr;
+    char cmd[4096];
+
+    global_gfx = gfx;
+   
+    ptr = rindex(file_name, '/');
+    if (ptr) 
+        ptr += 1;
+    else
+        ptr = file_name;
+    sprintf(cmd, "gcc -c -I. -I./include -I%s %s -o /tmp/stereo-%s.o ; cd /tmp ; "
+                 "gcc -shared -Wl,-soname,stereo-%s.so stereo-%s.o -o stereo-%s.so\n",
+	         ((stereograph_include_dir)?
+		  stereograph_include_dir:"."),
+	         file_name, ptr, ptr, ptr, ptr);
+    system(cmd);
+    
+    sprintf(cmd, "/tmp/stereo-%s.so", ptr);
+    dl_handle = dlopen(cmd, RTLD_LAZY);
+    system("rm -f /tmp/stereo-*");
+    if (!dl_handle) {
+       fprintf(stderr, "Couldn't create valid dynamic procedure !!\n");
+       return -1;
+    }
+   
+    iproc = dlsym(dl_handle, "process");
+    if ((ptr = dlerror()) != NULL || !iproc) {
+       if (ptr) fprintf(stderr, "Error: %s\n", ptr);
+       fprintf(stderr, "Couldn't load process() in dynamic procedure !!\n");
+       return -1;       
+    }
+   
+    iproc();
+    dlclose(dl_handle);
+
+    if (auxil && pixel_color) {
+       free(pixel_color);
+       pixel_color = NULL;
+    }
+   
+    return 0;
 }
 
 struct error_mgr {
@@ -483,11 +832,18 @@ int GFX_Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx
 	png_structp png_ptr;
 	png_infop info_ptr;
 	png_infop end_info;
-
 	int bit_depth, color_type, interlace_type, interlace_passes;
 
 	//unsigned char header_check[8];
 	int z;
+#if __BYTE_ORDER == __BIG_ENDIAN
+        int p;
+        unsigned char r, g, b;
+#endif
+        /*
+	int p;
+        unsigned char r, g, b;
+	 */
 
 	/* checking png header */
 	//fread(header_check, sizeof(char), 8, ifile);
@@ -549,12 +905,12 @@ int GFX_Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx
 		
 		/* reduce from 16 bits/channel to 8 bits */
 			/* correct use of little endian */
-		/*if (bit_depth == 16) {*/
-		#ifndef BIG_ENDIAN
-			png_set_swap(png_ptr);  // swap byte pairs to little endian
+		if (bit_depth == 16) {
+		#if __BYTE_ORDER == __BIG_ENDIAN
+		  //png_set_swap(png_ptr);  // swap byte pairs to little endian
 		#endif
-		png_set_strip_16(png_ptr);
-		/*}*/
+		  //png_set_strip_16(png_ptr);
+		}
 
 
 		/* if it's a gray scale, convert it to RGB */
@@ -585,6 +941,15 @@ int GFX_Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx
 		/* alternatively read it row by row, interlacing as expected */
 		for(z = 0; z < (gfx->Height * interlace_passes); z++)
 			png_read_row(png_ptr, (void *) (gfx->Data + ((z % gfx->Height) * gfx->Width)), NULL);
+#if __BYTE_ORDER == __BIG_ENDIAN
+		for(z = 0; z < (gfx->Width * gfx->Height); z++) {
+		        p = gfx->Data[z];
+		        r = (p>>24)&255;
+		        g = (p>>16)&255;
+		        b = p>>8;
+			gfx->Data[z] = r + (g<<8) + (b<<16);
+		}
+#endif
 
 		png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
 		/* that's it */		
@@ -634,7 +999,7 @@ int GFX_Write_JPG (FILE *ofile, struct GFX_DATA *gfx)
 	 * the raw data to the JPEG routine. Otherwise, we must
 	 * build an array of RGB triples in 'buffer'.
 	 */
-	d = buffer;
+        d = buffer;
 	for (i = 0; i < gfx->Width; ++i) {
 	    p = gfx->Data[z];
 	    z++;
@@ -664,6 +1029,10 @@ int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
 	png_infop info_ptr;
 
 	int z;
+#if __BYTE_ORDER == __BIG_ENDIAN
+        int p, h, u;
+        unsigned char *ptr;
+#endif
 
 	/* initializing */
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, user_error_ptr, NULL, NULL);
@@ -700,13 +1069,29 @@ int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
 	png_write_info(png_ptr, info_ptr);
 
 	/*
-	#ifndef BIG_ENDIAN
+	#if __BYTE_ORDER = __LITTLE_ENDIAN
 		png_set_swap(png_ptr);  // swap bytes to big endian, for little endian machines and only useful when writing 16 bits/channel;
 	#endif
 	*/
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+        ptr = (unsigned char *)malloc(4*gfx->Width);
+	for(h = 0; h < gfx->Height; h++) {
+	  u = -1;
+          for (z = 0; z < gfx->Width; z++) {
+            p = gfx->Data[h * gfx->Width + z];
+            ptr[++u] = p&255;
+            ptr[++u] = (p>>8)&255;     
+            ptr[++u] = (p>>16)&255;
+            ptr[++u] = 0;
+          }  
+          png_write_row(png_ptr, (void *) ptr);
+	}
+        free(ptr);
+#else
 	for(z = 0; z < gfx->Height; z++)
                 png_write_row(png_ptr, (void *) (gfx->Data + z * gfx->Width));
+#endif   
 
 	png_write_end(png_ptr, NULL);
 
@@ -837,19 +1222,27 @@ int GFX_Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c) {
 			(*c) = palette[(int)getc(ifile)];
 		else
 			(*c) = (int)getc(ifile) * 65793;  /* 65793 = (1+256+65536) */
-	} else if(bits == 16) {
+	} else if(bits == 16) {	   
 			z1 = getc(ifile);
-			z2 = getc(ifile);
+			z2 = getc(ifile);	   
 			r = (int)((255.0/31.0) * (float)((z1 & 124) / 4) );  /* 124 = 64 + 32 + 16 + 8 + 4 */
 			g = (int)((255.0/31.0) * (float)(((z1 & 3) << 3) | ((z2 & 224) / 32)) );  /* 224 = 128 + 64 + 32 */
 			b = (int)((255.0/31.0) * (float)(z2 & 31) );
+#if __BYTE_ORDER == __BIG_ENDIAN	   
+			(*c) = (r << 16) + (g << 8) + b;
+#else	   
 			(*c) = r + (g << 8) + (b << 16);
+#endif	   
 			a = z1 & 128;
 		} else {
 			r = getc(ifile);
 			g = getc(ifile);
 			b = getc(ifile);
+#if __BYTE_ORDER == __BIG_ENDIAN	   
+			(*c) = (r << 16) + (g << 8) + b;
+#else	   
 			(*c) = r + (g << 8) + (b << 16);
+#endif	   
 			if(bits == 32)
 				a = getc(ifile);
 		}
@@ -917,9 +1310,15 @@ int GFX_Write_TARGA (FILE *ofile, struct GFX_DATA *gfx)
 	a = 0;
 	for(y = gfx->Height - 1; (y >= 0) && (a != EOF); y--)
 		for(x = 0; (x < gfx->Width) && (a != EOF); x++)	{
+#if __BYTE_ORDER == __BIG_ENDIAN		   
+			putc((gfx->Data[y * gfx->Width + x] >>16) & 255, ofile);
+			putc((gfx->Data[y * gfx->Width + x] >> 8) & 255, ofile);
+			a = putc(gfx->Data[y * gfx->Width + x] & 255, ofile);
+#else		   
 			putc(gfx->Data[y * gfx->Width + x] & 255, ofile);
 			putc((gfx->Data[y * gfx->Width + x] >> 8) & 255, ofile);
 			a = putc((gfx->Data[y * gfx->Width + x] >> 16) & 255, ofile);
+#endif		   
 		}
 	if(a != EOF) {
 		return 0;
@@ -1154,4 +1553,252 @@ int GFX_Generate_SinlineTexture(struct GFX_DATA *gfx)
 	return 0;
 }
 
+#ifdef X11GUI
 
+Bool evpred(d, e, a)
+Display *              d;
+XEvent *               e;
+XPointer               a;
+{
+        return (True);
+}
+
+int GFX_Write_X11 (FILE * ofile, struct GFX_DATA *gfx)
+{
+        static char *gfx_msg[GFX_IO_C+1] = {
+	   "Hide menu",
+	   "Save as .jpg",
+	   "Save as .png",	     
+	   "Save as .ppm",
+	   "Save as .tga",
+	   "Edit in xpaint"
+	};
+        char name[256];
+	Display *dpy;
+        Window root, win;
+        XImage * image;
+        Pixmap pixmap;
+        Visual * visual;
+        Colormap cmap;
+        GC gc;
+        int scr;
+        int bigendian;
+        int p, x, y, z, t;
+        int depth, color_pad;
+        int do_print = 0;
+        int i, j;
+        unsigned char *ind = NULL;
+        unsigned char r, g, b;
+        Pixel black, white;
+        XGCValues gcv;
+        XFontStruct *font;
+        XEvent ev;
+        XColor xc;
+        Atom wm_delete_window, wm_protocols;
+        KeySym keysym;
+        char                    buffer[1];
+
+	dpy = XOpenDisplay(NULL);
+        if (dpy == (Display *)NULL) {
+                fprintf(stderr, "X11: can't open display\n");
+                exit(-1);
+        }
+        bigendian = (ImageByteOrder(dpy) == MSBFirst);
+        scr = DefaultScreen(dpy);
+        visual = DefaultVisual(dpy, scr);
+        root = RootWindow(dpy, scr);
+
+        black = BlackPixel(dpy, scr);
+        white = WhitePixel(dpy, scr);
+        font = XLoadQueryFont(dpy, "7x13");
+   
+	gcv.background = black;
+	gcv.foreground = white;
+        gc = XCreateGC(dpy, root, GCForeground | GCBackground, &gcv);
+        XSetFont(dpy, gc, font->fid);
+
+        depth = DefaultDepth(dpy, scr);
+        if (depth > 16)
+            color_pad = 32;
+        else if (depth > 8)
+            color_pad = 16;
+        else
+            color_pad = 8;
+        
+        wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", False);
+        wm_delete_window = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+
+        win = XCreateSimpleWindow(dpy, root,
+			    50, 50, gfx->Width, gfx->Height, 0,
+		            white, black);
+        pixmap = XCreatePixmap(dpy, root, gfx->Width, gfx->Height, depth);
+        image = XCreateImage(dpy, visual, depth,
+                    ZPixmap, 0, NULL, 
+                    gfx->Width, gfx->Height, color_pad, 0);
+        z = 0;
+        image->data = malloc(gfx->Height*image->bytes_per_line);
+   
+        if (depth<=8) {
+            cmap = XCreateColormap(dpy, root, visual, AllocNone);
+	    ind = (char *) malloc(252);
+            xc.flags = DoRed | DoGreen | DoBlue;
+	    for (b = 0; b < 6; b++)
+	    for (g = 0; g < 7; g++)
+	    for (r = 0; r < 6; r++) {
+	        x = b*42 + g*6 + r;
+	        xc.red = (r*51)<<8;
+	        xc.green = (g*42+g/2)<<8;
+	        xc.blue = (b*51)<<8;
+	        XAllocColor(dpy, cmap, &xc);
+	        ind[x] = xc.pixel;
+	    }
+	    black = ind[0];
+	    white = ind[251];
+	    XSetWindowColormap(dpy, win, cmap);
+	}
+
+        if (depth == 16 && visual->green_mask==992) depth = 15;
+        if (depth > 16)
+        for (y = 0; y < gfx->Height; y++)
+	  for (x = 0; x < gfx->Width; x++) {
+	      p = gfx->Data[z];
+              t = y * image->bytes_per_line + x * 4;
+              if (bigendian) {
+                image->data[t+1] = p&255;	     
+                image->data[t+2] = (p>>8)&255;
+                image->data[t+3] = (p>>16)&255;
+	      } else {
+              image->data[t] = (p>>16)&255;
+              image->data[t+1] = (p>>8)&255;
+              image->data[t+2] = p&255;
+	      }
+              z++;
+	  }
+        if (depth == 16)
+        for (y = 0; y < gfx->Height; y++)
+	  for (x = 0; x < gfx->Width; x++) {
+	      p = gfx->Data[z];
+              t = y * image->bytes_per_line + x * 2;
+	      r = p&255;
+	      g = (p>>8)&255;
+	      b = (p>>16)&255;
+              if (bigendian) {	     
+                image->data[t+1] = (b&248)>>3 | (g&28)<<3;
+                image->data[t] = (g&224)>>5 | (r&248);
+	      } else {
+                image->data[t] = (b&248)>>3 | (g&28)<<3;
+                image->data[t+1] = (g&224)>>5 | (r&248);
+	      }
+              z++;
+	  }
+        if (depth == 15)
+        for (y = 0; y < gfx->Height; y++)
+	  for (x = 0; x < gfx->Width; x++) {
+	      p = gfx->Data[z];
+              t = y * image->bytes_per_line + x * 2;
+	      r = p&255;
+	      g = (p>>8)&255;
+	      b = (p>>16)&255;
+              if (bigendian) {
+                image->data[t+1] = (b&248)>>3 | (g&56)<<2;
+                image->data[t] = (g&192)>>6 | (r&248)>>1;
+	      } else {
+                image->data[t] = (b&248)>>3 | (g&56)<<2;
+                image->data[t+1] = (g&192)>>6 | (r&248)>>1;
+	      }
+              z++;
+	  }
+        if (depth <= 8)
+        for (y = 0; y < gfx->Height; y++)
+	  for (x = 0; x < gfx->Width; x++) {
+	      p = gfx->Data[z];
+              t = y * image->bytes_per_line + x;
+	      r = p&255;
+	      g = (p>>8)&255;
+	      b = (p>>16)&255;
+              image->data[t] = ind[((b+24)/51)*42+((2*g+41)/85)*6+(r+24)/51];
+              z++;
+	  }
+        XStoreName(dpy, win, "Stereograph");
+	XSetWMProtocols(dpy, win, &wm_delete_window, 1);
+        XSelectInput(dpy, win, ButtonPressMask | ButtonReleaseMask |
+		               KeyReleaseMask | ExposureMask);
+        XPutImage(dpy, pixmap, gc, image, 0, 0, 0, 0, gfx->Width, gfx->Height);
+        XDestroyImage(image);
+        XSetWindowBackgroundPixmap(dpy, win, pixmap);
+        XMapRaised(dpy, win);
+	XFlush(dpy);
+
+        for (;;) {
+	    if (XCheckIfEvent(dpy, &ev, evpred, (XPointer)0)) {
+                if (ev.type == ClientMessage &&
+                    ev.xclient.message_type == wm_protocols &&
+                    ev.xclient.format == 32 &&
+                    ev.xclient.data.l[0] == wm_delete_window) {
+		finish:
+		    XDestroyWindow(dpy, win);
+		    XFreePixmap(dpy, pixmap);
+                    XCloseDisplay(dpy);
+	            exit(0);
+		}
+                if (ev.type == ButtonPress) {
+		    if (!do_print) do_print = 1;
+		    else
+		    if (do_print) do_print = 2;
+		}
+		if (ev.type == ButtonRelease && do_print) {
+		    if (do_print == 1) 
+		        do_print = 2;
+		    else {
+		        j = -1;
+		        for (i=0; i<=GFX_IO_C; i++)
+			    if (ev.xbutton.x>10 && ev.xbutton.x<130 &&
+			        ev.xbutton.y>30*i+10 && ev.xbutton.y<30*i+30)
+			        j = i;
+		        if (j == 0) do_print = 0;
+		        else
+			if (j>0 && j<GFX_IO_C) {
+			    sprintf(name, "Saving into : stereo%s", gfx_msg[j]+8);
+		            XSetForeground(dpy, gc, black);
+		            XFillRectangle(dpy, win, gc, 0, 
+					   gfx->Height-30, 190, 30);
+		            XSetForeground(dpy, gc, white);
+			    XDrawString(dpy, win, gc, 10, gfx->Height-10,
+					name, strlen(name));
+			    XFlush(dpy);
+			    GFX_Write_File(name+14, j, gfx);			   
+		        }
+			if (j==GFX_IO_C) {
+			    GFX_Write_File("stereo.png", GFX_IO_PNG, gfx);
+			    sprintf(name, "xpaint stereo.png ; rm -f stereo.png &");
+			    system(name);
+			}
+		        if (do_print) continue;			   
+		    }
+		}
+		if (ev.type == KeyRelease) {
+                    XLookupString((XKeyEvent *) &ev, buffer, 1, &keysym, NULL);
+		    if (keysym == XK_p || keysym == XK_P)
+		        do_print = 1;
+		    if (keysym == XK_q || keysym == XK_Q ||
+                        keysym == XK_Escape) goto finish;
+		}
+	        if (do_print) {
+		   XSetForeground(dpy, gc, black);
+		   XFillRectangle(dpy, win, gc, 0, 0, 140, 190);
+		   XSetForeground(dpy, gc, white);				  
+		   for (i=0; i<=GFX_IO_C; i++) {
+		       XDrawRectangle(dpy, win, gc, 10, 30*i+10, 120, 20);
+		       XDrawString(dpy, win, gc, 20, 30*i+24,
+				   gfx_msg[i], strlen(gfx_msg[i]));
+		   }
+		   
+		} else
+		   XClearWindow(dpy, win);
+	   } else
+	     usleep(50000);
+	}
+        exit(-1);
+}
+
+#endif /* X11GUI */

@@ -3,5 +3,6 @@
 
 int stereograph_verbose;
 int stereograph_error;
-
+char * stereograph_include_dir;
+  
 #endif /* _GLOBALS_H_ */

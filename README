@@ -1,4 +1,4 @@
-Stereograph for linux, an advanced stereogram generator, v0.29a
+Stereograph for linux, an advanced stereogram generator, v0.30a
 (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
 ------------------------------------------------------------------------------
 
@@ -148,8 +148,15 @@ this issue.
   -d <greater than 0.0 up to 8.0>
      distance
      describes the distance of your eyes and the virtual glass that is between
-     you and your stereogram. Default value is 0.6, feel free to walk backwards
-     up to 8.0 steps.
+     you and your stereogram. Default value is 5.0 since release 0.30a, feel
+     free to walk backwards up to 20.0 steps. 1.0 distance points reflect the
+     distance between the screen and the maximum depth.
+
+  -p <greater than 0.0 up to 1.0>
+     front factor
+     defines the depth of the nearest point (typically mere white). This value
+     should be rendered linear which means that for a doubled value depth
+     contrast of the scene should be doubled too.
 
   -e <-1.0..1.0>
      eye shift

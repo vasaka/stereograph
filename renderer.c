@@ -1,4 +1,4 @@
-/* Stereograph 0.29a, 14/07/2000;
+/* Stereograph 0.30a, 26/12/2000;
  * renderer, stereographer's engine;
  * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -112,7 +112,7 @@ int Initialize_Renderer(void)
 		Renderer.internal_a = (1.0 / (Texture.Width * Texture.Width)) - (0.25 / (Renderer.realdist * Renderer.realdist));
 		Renderer.eyeshift = Param.Eyeshift*0.5;
 		if(
-			((Param.Distance + 1) > 1.0) && ((Param.Distance + 1) <= 9.0) &&
+			((Param.Distance + 1) > 1.0) && ((Param.Distance + 1) <= 21.0) &&
 			(Renderer.eyeshift >= -0.5) && (Renderer.eyeshift <= 0.5) &&
 			(Renderer.naa > 0) && (Renderer.naa <= 32) &&
 			(Renderer.nzoom > 0) && (Renderer.nzoom <= 32) &&
@@ -159,7 +159,7 @@ int Initialize_Renderer(void)
 		Renderer.internal_a = (1.0 / (Texture.Width * T_Texture[0]->Width)) - (0.25 / (Renderer.realdist * Renderer.realdist));
 		Renderer.eyeshift = Param.Eyeshift*0.5;
 		if(
-			((Param.Distance + 1) > 1.0) && ((Param.Distance + 1) <= 9.0) &&
+			((Param.Distance + 1) > 1.0) && ((Param.Distance + 1) <= 21.0) &&
 			(Renderer.eyeshift >= -0.5) && (Renderer.eyeshift <= 0.5) &&
 			(Renderer.naa > 0) && (Renderer.naa <= 32) &&
 			(Renderer.nzoom > 0) && (Renderer.nzoom <= 32) &&
@@ -294,10 +294,10 @@ float GetChange(int x, int *base_data)
 {
 	float s, b, d;
 	/* extracting out of 24 bit RGB data the brightness/intensitiy indicating information */
-	/* value is extended from 0-255 up to 0-765 */
+	/* accuracy range was extended from 0-255 up to 0-765 */
 	if(Param.Linear) {
-		s = (1.0 - ((base_data[x] & 255) + ((base_data[x] / 256) & 255) + ((base_data[x] / 65536) & 255)) / 765.0);
-		b = ((Param.Distance + s)*(Param.Distance + 2.0) / (Param.Distance + s + 1.0) / (Param.Distance + 1.0)) * Renderer.max_change_tex_width;
+		s = (1.0 - ((base_data[x] & 255) + ((base_data[x] / 256) & 255) + ((base_data[x] / 65536) & 255)) / 766.0 * Param.Front);
+		b = (float) Texture.Width * (1.0 + Param.Distance) / (1.0 + (Param.Distance / s));
 	} else {
 		s = ((base_data[x] & 255) + ((base_data[x] / 256) & 255) + ((base_data[x] / 65536) & 255)) / 765.0;
 		d = Renderer.realdist - (float) Renderer.max_change_tex_width * s;

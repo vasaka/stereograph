@@ -1,4 +1,4 @@
-/* Stereograph 0.29a, 14/07/2000;
+/* Stereograph 0.30a, 26/12/2000;
  * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define STEREOGRAPH_VERSION "0.29a"
+#define STEREOGRAPH_VERSION "0.30a"
 
 #include "renderer.h"
 #include "gfxio.h"
@@ -48,7 +48,7 @@ int random_texture_type = TEX_GRAYSCALE;
 
 void print_info(void) {
 	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga] [-l none/back/top]\n\n");
-	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
+	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -p front factor                    \n                       -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
 }
 
 
@@ -65,8 +65,8 @@ int main (int argc, char **argv) {
 	pParam->AAr = 0;
 	pParam->Startx = 0;
 	pParam->Starty = 0;
-	pParam->Front = 1.0;
-	pParam->Distance = 0.6;
+	pParam->Front = 0.4;
+	pParam->Distance = 5.0;
 	pParam->Eyeshift = 0.0;
 
 	pParam->T_level = T_BACK_LEVEL;
@@ -130,7 +130,7 @@ int main (int argc, char **argv) {
 					if(!(last_error = Initialize_Renderer())) {
 						int y, s;
 						if(verbose) printf("success;\n");
-						if(verbose) printf("using following parametres (zadexy): %i %i %f %f %i %i;\n", pParam->Zoom, pParam->AA, pParam->Distance, pParam->Eyeshift, pParam->Startx, pParam->Starty);
+						if(verbose) printf("using following parametres (zadpexy): %i %i %f %f %f %i %i;\n", pParam->Zoom, pParam->AA, pParam->Distance, pParam->Front, pParam->Eyeshift, pParam->Startx, pParam->Starty);
 						if(verbose && pParam->AAr)
 							printf("anti-artefacts feature enabled;\n");
 						if(verbose && !pParam->Linear)
@@ -232,7 +232,7 @@ int main (int argc, char **argv) {
 							if(!(last_error = Initialize_Renderer())) {
 								int y, s;
 								if(verbose) printf("success;\n");
-								if(verbose) printf("using following parametres (zadexy): %i %i %f %f %i %i;\n", pParam->Zoom, pParam->AA, pParam->Distance, pParam->Eyeshift, pParam->Startx, pParam->Starty);
+								if(verbose) printf("using following parametres (zadpexy): %i %i %f %f %f %i %i;\n", pParam->Zoom, pParam->AA, pParam->Distance, pParam->Front, pParam->Eyeshift, pParam->Startx, pParam->Starty);
 								if(verbose && pParam->AAr)
 									printf("anti-artefacts feature enabled;\n");
 								if(verbose) printf("processing...");
@@ -373,6 +373,9 @@ int parse_args (int argc, char **argv) {
 					break;
 				case 'd' :
 					if (z < (argc - 1)) pParam->Distance = (float) atof(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					break;
+				case 'p' :
+					if (z < (argc - 1)) pParam->Front = (float) atof(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
 					break;
 				case 'e' :
 					if (z < (argc - 1)) pParam->Eyeshift = (float) atof(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }

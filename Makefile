@@ -1,5 +1,5 @@
 #
-# Makefile, Stereograph 0.30a
+# Makefile, Stereograph 0.31a
 #
 # If necessary please edit to suit your system.
 #
@@ -12,6 +12,7 @@
 # Linux
 CC  = gcc
 CFLAGS = -Wall -O2 -Dlinux
+#CFLAGS = -Wall -O2 -Dlinux -DBIG_ENDIAN
 LDFLAGS = -lm /usr/lib/libpng.so /usr/lib/libz.so
 
 # HPUX

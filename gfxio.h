@@ -1,6 +1,6 @@
 /* Stereograph
  * Header file;
- * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
+ * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,51 +18,63 @@
  */
 
 
-#define GFX_PNG   0
-#define GFX_PPM   1
-#define GFX_TARGA 2
+/* error handling */
+#define GFX_ERROR_READ_ERROR       -1
+#define GFX_ERROR_WRITE_ERROR      -2
+#define GFX_ERROR_UNSUPP_FORMAT    -3
+#define GFX_ERROR_MEMORY_PROBLEM   -4
+#define GFX_ERROR_UNSUPP_RANDOMTEX -5
+#define GFX_ERROR_UNSUPP_T_LEVEL   -6
+#define GFX_ERROR_LIBPNG           -7
 
-#define TEX_BW        0
-#define TEX_COLORED   1
-#define TEX_GRAYSCALE 2
-#define TEX_SINLINE   3
+/* constants for io format definitions */
+#define GFX_IO_PNG   0
+#define GFX_IO_PPM   1
+#define GFX_IO_TARGA 2
 
-#define T_NO_LEVEL   0
-#define T_BACK_LEVEL 1
-#define T_TOP_LEVEL  2
+/* constant types for random textures */
+#define GFX_TEX_BW        0
+#define GFX_TEX_COLORED   1
+#define GFX_TEX_GRAYSCALE 2
+#define GFX_TEX_SINLINE   3
+
+/* consts for GFX_AdjustLevel */
+#define GFX_T_NO_LEVEL   0
+#define GFX_T_BACK_LEVEL 1
+#define GFX_T_TOP_LEVEL  2
 
 
 /* gfx io functions */
-int Read_Gfx_File (char *file_name, struct GFX_DATA *gfx);
-int Write_Gfx_File (char *file_name, int output_format, struct GFX_DATA *gfx);
+int GFX_Read_File (char *file_name, struct GFX_DATA *gfx);
+int GFX_Write_File (char *file_name, int output_format, struct GFX_DATA *gfx);
 
 /* invert a base gfx */
-int Invert_GFX(struct GFX_DATA *gfx);
+int GFX_Invert(struct GFX_DATA *gfx);
 
 /* adjust back base levels */
-int T_adjust_level(struct GFX_DATA **T_gfx, int T_layers, int T_level);
+int GFX_T_AdjustLevel(struct GFX_DATA *T_gfx, int T_layers, int T_level);
 
 /* add two black triangles to aid */
-int Add_Triangles(int x, int size, int width, struct GFX_DATA *gfx);
+int GFX_AddTriangles(int x, int size, int width, struct GFX_DATA *gfx);
 
 /* generates a random texture */
-int Generate_Random_Texture(struct GFX_DATA *gfx, int width, int height, int type);
+int GFX_Generate_RandomTexture(struct GFX_DATA *gfx, int width, int height, int type);
 
-/* resizes a gfx - decreases the width */
-int Resize_GFX(struct GFX_DATA *gfx, int width);
+/* resizes a gfx - decreases AND ONLY DECREASES the width            */
+/* if the width argument is zero, no changes to the gfx are applied  */
+int GFX_Resize(struct GFX_DATA *gfx, int width);
 
 
+/* gfxio internals */
+int GFX_Identify_File(FILE *ifile, unsigned char *check_header);
 
-/*** gfxio internals ***/
-int identify_GFX_file(FILE *ifile, unsigned char *check_header);
+int GFX_Read_PPM (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
+int GFX_Read_PNG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
+int GFX_Read_TARGA (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
+int GFX_Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c);
 
-int Read_PPM (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
-int Read_PNG (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
-int Read_TARGA (FILE *ifile, unsigned char* check_header, struct GFX_DATA *gfx);
-int Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c);
+int GFX_Write_PPM (FILE *ofile, struct GFX_DATA *gfx);
+int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx);
+int GFX_Write_TARGA (FILE *ofile, struct GFX_DATA *gfx);
 
-int Write_PPM (FILE *ofile, struct GFX_DATA *gfx);
-int Write_PNG (FILE *ofile, struct GFX_DATA *gfx);
-int Write_TARGA (FILE *ofile, struct GFX_DATA *gfx);
-
-int Generate_Sinline_Texture(struct GFX_DATA *gfx);
+int GFX_Generate_SinlineTexture(struct GFX_DATA *gfx);

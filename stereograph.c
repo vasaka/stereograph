@@ -1,5 +1,6 @@
-/* Stereograph 0.30a, 26/12/2000;
- * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
+/* Stereograph 0.31a, 18/08/2001;
+ * a stereogram generator;
+ * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,437 +21,500 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define STEREOGRAPH_VERSION "0.30a"
+
+#define STEREOGRAPH_VERSION "0.31a"
 
 #include "renderer.h"
 #include "gfxio.h"
 #include "stereograph.h"
 #include "globals.h"
 
-char *base_file_name = NULL;
-char *texture_file_name = NULL;
-char *stereo_file_name = NULL;
-
-char **T_base_file_name = NULL;
-char **T_texture_file_name = NULL;
-
-int output_format = 0;
-
-/* interface to the renderer */
-struct PARAMS *pParam;
-struct GFX_DATA *pBase, *pTexture, *pStereo;
-
-struct GFX_DATA ***T_pBase, ***T_pTexture;
-
-int texture_width_to_use = 0;
-int random_texture_type = TEX_GRAYSCALE;
 
 
-void print_info(void) {
-	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga] [-l none/back/top]\n\n");
-	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -p front factor                    \n                       -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
+/* control for the default binary */
+int main (int argc, char **argv) {
+
+        return stereograph_main(argc, argv);
+
 }
 
 
 
-int main (int argc, char **argv) {
-	int last_error = 0;
+/* regard this function including the following as a reference implementation for a versatile interface to the renderer */
+int stereograph_main(int argc, char **argv) {
 
-	Get_GFX_Pointers(&pParam, &pBase, &pTexture, &pStereo);
+        struct STEREOGRAPH_PARAMS stereograph_params;
 
-	pParam->Linear = 1;
-	pParam->T_layers = 0;
-	pParam->Zoom = 1;
-	pParam->AA = 4;
-	pParam->AAr = 0;
-	pParam->Startx = 0;
-	pParam->Starty = 0;
-	pParam->Front = 0.4;
-	pParam->Distance = 5.0;
-	pParam->Eyeshift = 0.0;
+	stereograph_verbose = 0;
+	stereograph_error = 0;
 
-	pParam->T_level = T_BACK_LEVEL;
-	pParam->Invert = 0;
-	pParam->Triangles = 0;
+	stereograph_param_init(&stereograph_params);
 
-	pBase->Data = NULL;
-	pTexture->Data = NULL;
-	pStereo->Data = NULL;
-	base_file_name = NULL;
-	texture_file_name = NULL;
-	stereo_file_name = NULL;
-
-	verbose = 0;
-
-	if(parse_args(argc, argv))
-		return -1;
-
-	if(!stereo_file_name && base_file_name && texture_file_name && verbose) {
-		fprintf(stderr, "verbose disabled for standard output\n");
-		verbose = 0;
+	if( (stereograph_error = stereograph_parse_args(&stereograph_params, argc, argv)) ) {
+	        if(stereograph_error == STEREOGRAPH_QUIT)
+		        return 0;
+		else
+		        return stereograph_error;
 	}
 
-	if(verbose) printf("Stereograph for linux Version %s\n", STEREOGRAPH_VERSION);
+	return stereograph_run(&stereograph_params);
 
-	if(base_file_name && (texture_file_name || (texture_width_to_use > 0))) {
-		if(pParam->T_layers <= 0) {
-			/* solid (single) tracing */
-			if(verbose) printf("loading base '%s'...", base_file_name);
-			if(!Read_Gfx_File(base_file_name, pBase)) {
-				if(!texture_file_name) {
-					if(verbose) printf("generating random texture (%i*%i)...", texture_width_to_use, pBase->Height);
-					if(texture_width_to_use < pBase->Width) {
-						last_error = Generate_Random_Texture(pTexture, texture_width_to_use, pBase->Height, random_texture_type);
+}
+
+
+/* this function manages all necessary inits and calls to all modules */
+int stereograph_run(struct STEREOGRAPH_PARAMS *pParams) {
+
+        int last_error;
+
+	/* check the output channel that forces to be quiet if gfx out equals stdout */
+	if(!pParams->Stereo_File_Name && pParams->Base_File_Name && pParams->Texture_File_Name && stereograph_verbose) {
+		fprintf(stderr, "stereograph_verbose disabled for standard output\n");
+		stereograph_verbose = 0;
+	}
+
+	if(stereograph_verbose) printf("Stereograph for linux Version %s\n", STEREOGRAPH_VERSION);
+
+	if(!(last_error = stereograph_gfx_prepare(pParams)))
+	        /* if all gfx data is ready, we process it */
+	        last_error = stereograph_gfx_process(pParams);
+
+	stereograph_gfx_clean(pParams);
+
+	return last_error;
+
+}
+
+
+int stereograph_gfx_prepare(struct STEREOGRAPH_PARAMS *pParams) {
+	int last_error = 0;
+
+        /* let's see if there is a base file and a texture well defined */
+        if(pParams->Base_File_Name && (pParams->Texture_File_Name || (pParams->Texture_Width_To_Use > 0))) {
+	        if(pParams->Renderer_Params.T_Layers <= 0) {
+		        /* single layer base and texture preparation */
+
+		        /* first of all, load the base file */
+		        if(stereograph_verbose) printf("loading base '%s'...", pParams->Base_File_Name);
+			if(!GFX_Read_File(pParams->Base_File_Name, pParams->GFX_Base)) {
+
+			        /* on success, load or generate the texutre */
+			        if(!pParams->Texture_File_Name) {
+			                /* generate it */
+				        if(stereograph_verbose) printf("generating random texture (%i*%i)...", pParams->Texture_Width_To_Use, pParams->GFX_Base->Height);
+					if(pParams->Texture_Width_To_Use < pParams->GFX_Base->Width) {
+					        last_error = GFX_Generate_RandomTexture(pParams->GFX_Texture, pParams->Texture_Width_To_Use, pParams->GFX_Base->Height, pParams->Texture_Type);
 					} else {
-						if(verbose) printf("FAILED\n");
-						fprintf(stderr, "texture_width_to_use is too big. This may not be greater than the base width.\n");
-						last_error = -2;
+					        if(stereograph_verbose) printf("FAILED\n");
+						fprintf(stderr, "Texture_Width_To_Use is too big. This parametre may not be greater than the base width.\n");
+						last_error = STEREOGRAPH_ERROR;
 					}
 				} else {
-					if(verbose) printf("loading texture '%s'...", texture_file_name);
-					last_error = Read_Gfx_File(texture_file_name, pTexture);
-					if(!last_error && (texture_width_to_use > 0)) {
-						if(pTexture->Width >= texture_width_to_use) {
-							last_error = Resize_GFX(pTexture, texture_width_to_use);
-						} else {
-							fprintf(stderr, "parametre error: texture_width_to_use is too big;\nmust be less than the texture width.\n");
-							last_error = -2;
-						}
-					}
+				        /* load it */
+				        if(stereograph_verbose) printf("loading texture '%s'...", pParams->Texture_File_Name);
+					last_error = GFX_Read_File(pParams->Texture_File_Name, pParams->GFX_Texture);
+					if(!last_error && (pParams->Texture_Width_To_Use > 0))
+					        last_error = GFX_Resize(pParams->GFX_Texture, pParams->Texture_Width_To_Use);
 				}
-				if(!last_error && pParam->Invert) {
-					if((last_error = Invert_GFX(pBase))) {
-						if(verbose) printf("FAILED\n");
+				/* invert the base if necessary */
+				if(!last_error && pParams->Base_Invert) {
+				        if( (last_error = GFX_Invert(pParams->GFX_Base)) ) {
+					        if(stereograph_verbose) printf("FAILED\n");
 						fprintf(stderr, "error inverting base;\n");
 					}
 				}
-				if(!last_error) {
-					/* setting up renderer; */
-					if(verbose) printf("initializing renderer...");
-					if(!(last_error = Initialize_Renderer())) {
-						int y, s;
-						if(verbose) printf("success;\n");
-						if(verbose) printf("using following parametres (zadpexy): %i %i %f %f %f %i %i;\n", pParam->Zoom, pParam->AA, pParam->Distance, pParam->Front, pParam->Eyeshift, pParam->Startx, pParam->Starty);
-						if(verbose && pParam->AAr)
-							printf("anti-artefacts feature enabled;\n");
-						if(verbose && !pParam->Linear)
-							printf("linear rendering disabled;\n");
-						if(verbose && pParam->Triangles)
-							printf("triangle aid enabled, a pair will be added after rendering;\n");
-						if(verbose) printf("processing...");
-                                	
-						for(y = 0, s = 0; (y < pBase->Height); y++) {
-							ProcessLine(y);
-							/* print simple status points (without refresh) */
-							for( ; verbose && (s < (58 * y / pBase->Height)); s++)
-								printf(".");
-						}
-						if(verbose) printf("completed;\n");
 
-						if(pParam->Triangles) {
-							if(verbose)
-								printf("adding triangles to the final image...");
-							Add_Triangles(pStereo->Width/2, 20*pParam->Zoom, pTexture->Width*pParam->Zoom, pStereo);
-							if(verbose)
-								printf("done;\n");
-						}
-	
-						if(verbose) printf("writing stereogram to disk...");
-						if(!Write_Gfx_File(stereo_file_name, output_format, pStereo) && verbose)
-							printf("completed;\n");
-					} else {
-						if(verbose)
-							printf("FAILED;\n");
-						else    	
-							fprintf(stderr, "initializing renderer...FAILED;\n");
-						switch (last_error) {
-							case -1 :
-								fprintf(stderr, "illegal parametre;\n\n");
-								print_info();
-								break;
-							case -2 :
-								fprintf(stderr, "width of texture file greater than the base;\nthis state is not processable;\ntry the -w option to resize the texture.\n");
-								break;
-							case -3 :
-								fprintf(stderr, "could not allocate memory.\n");
-						}
-						return -1;
-					}
-					Clear_Renderer();
-				}
-				free(pTexture->Data);
+			} else { /* gfx base read error */
+			        return STEREOGRAPH_ERROR; // ?
 			}
-			free(pBase->Data);
-			/* end of single trace */
 		} else {
-			/* transparent trace */
-			int z, a;
+		        /* multiple layer preparation */
+			int z;
 			
-			Get_T_GFX_Pointers(&T_pBase, &T_pTexture);
-			/* allocating multiple gfx data headers */
-				(*T_pBase) = (struct GFX_DATA**) malloc(sizeof(struct GFX_DATA*) * (pParam->T_layers+1));
-				(*T_pTexture) = (struct GFX_DATA**) malloc(sizeof(struct GFX_DATA*) * (pParam->T_layers+1));
-				a = 2;
-				if((*T_pBase) && (*T_pTexture)) {
-					a = 0;
-					for(z = 0; (z <= pParam->T_layers) && !a; z++) {
-						*((*T_pBase)+z) = (struct GFX_DATA*) malloc(sizeof(struct GFX_DATA));
-						(*((*T_pBase)+z))->Data = NULL;
-						*((*T_pTexture)+z) = (struct GFX_DATA*) malloc(sizeof(struct GFX_DATA));
-						(*((*T_pTexture)+z))->Data = NULL;
-						if(!*((*T_pBase)+z) || !*((*T_pTexture)+z))
-							a++;
-					}
+			if(stereograph_verbose) printf("rendering transparent layers enabled\nloading bases:\n");
+			for(z = 0; (z <= pParams->Renderer_Params.T_Layers) && !last_error; z++) {
+			        if(stereograph_verbose) printf("%s ", pParams->T_Base_File_Name[z]);
+				last_error = GFX_Read_File(pParams->T_Base_File_Name[z], pParams->GFX_Base + z);
+			}
+
+			if(!last_error) {
+			        if(stereograph_verbose) printf("done;\nloading textures:\n");
+				for(z = 0; (z <= pParams->Renderer_Params.T_Layers) && !last_error; z++) {
+				        if(stereograph_verbose) printf("%s ", pParams->T_Texture_File_Name[z]);
+					last_error = GFX_Read_File(pParams->T_Texture_File_Name[z], pParams->GFX_Texture + z);
+					if(!last_error)
+					        last_error = GFX_Resize(pParams->GFX_Texture + z, pParams->Texture_Width_To_Use);
 				}
-				if(!a) {
-					if(verbose) printf("rendering transparent layers enabled\nloading bases:\n");
-					for(z = 0; (z <= pParam->T_layers) && !a; z++) {
-						if(verbose) printf("%s ", T_base_file_name[z]);
-						a = Read_Gfx_File(T_base_file_name[z], *((*T_pBase)+z));
-					}
-					if(!a) {
-						if(verbose) printf("done;\nloading textures:\n");
-						for(z = 0; (z <= pParam->T_layers) && !a; z++) {
-							if(verbose) printf("%s ", T_texture_file_name[z]);
-							a = Read_Gfx_File(T_texture_file_name[z], *((*T_pTexture)+z));
-							if((texture_width_to_use > 0) && !a) {
-								if((*((*T_pTexture)+z))->Width >= texture_width_to_use) {
-									a = Resize_GFX((*((*T_pTexture)+z)), texture_width_to_use);
-								} else {
-									fprintf(stderr, "parametre error: texture_width_to_use is too big;\nmust be less than the texture width.\n");
-									a = -2;
-								}
-							}
-						}
-						if(verbose && !a) printf("done;\n");
-						if(!a && pParam->T_level) {
-							a = T_adjust_level(*T_pBase, pParam->T_layers, pParam->T_level);
-						}
-						if(!a) {
-							/* setting up renderer; */
-							if(verbose) printf("initializing renderer...");
-							if(!(last_error = Initialize_Renderer())) {
-								int y, s;
-								if(verbose) printf("success;\n");
-								if(verbose) printf("using following parametres (zadpexy): %i %i %f %f %f %i %i;\n", pParam->Zoom, pParam->AA, pParam->Distance, pParam->Front, pParam->Eyeshift, pParam->Startx, pParam->Starty);
-								if(verbose && pParam->AAr)
-									printf("anti-artefacts feature enabled;\n");
-								if(verbose) printf("processing...");
-                                	
-								for(y = 0, s = 0; (y < (**T_pBase)->Height); y++) {
-									ProcessLine(y);
-									/* print simple status points (without refresh) */
-									for( ; verbose && (s < (58 * y / (**T_pBase)->Height)); s++)
-										printf(".");
-								}
-              		                	
-								if(verbose) printf("completed;\n");
-	
-								if(pParam->Triangles) {
-									if(verbose)
-										printf("adding triangles to the final image...");
-									Add_Triangles(pStereo->Width/2, 20*pParam->Zoom, pTexture->Width*pParam->Zoom, pStereo);
-									if(verbose)
-										printf("done;\n");
-								}
-	
-								if(verbose) printf("writing stereogram to disk...");
-								if(!Write_Gfx_File(stereo_file_name, output_format, pStereo) && verbose)
-									printf("completed;\n");
-							} else {
-								if(verbose)
-									printf("FAILED;\n");
-								else    	
-									fprintf(stderr, "initializing renderer...FAILED;\n");
-								switch (last_error) {
-									case -1 :
-										fprintf(stderr, "illegal parametre;\n\n");
-										print_info();
-										break;
-									case -2 :
-										fprintf(stderr, "width of the texture greater than the base;\nthis state is not processable;\ntry the -w option to resize the texture.\n");
-										break;
-									case -3 :
-										fprintf(stderr, "could not allocate memory;\n");
-										break;
-									case -4 :
-										fprintf(stderr, "base or texture image dimensions may NOT differ;\n");
-										break;
-									default :
-										fprintf(stderr, "illegal parametre/unable to initialize renderer;\n\n");
-										print_info();
-								}
-								return -1;
-							}
-							Clear_Renderer();
-						}
-						for(z = 0; z <= pParam->T_layers; z++)
-							free((*((*T_pTexture)+z))->Data);
-					}
-					for(z = 0; (z <= pParam->T_layers) && (a < 2); z++) {
-						free((*((*T_pBase)+z))->Data);
-						free(*((*T_pTexture)+z));
-						free(*((*T_pBase)+z));
-					}
-				} else {
-					/* malloc for the T_pBase or T_pTexture indices failed */
-					fprintf(stderr, "could not allocate memory for the gfx input headers\n");
-					return -1;
+
+				if(stereograph_verbose && !last_error) printf("done;\n");
+				if(!last_error && pParams->T_Base_Level) {
+				        last_error = GFX_T_AdjustLevel(pParams->GFX_Base, pParams->Renderer_Params.T_Layers, pParams->T_Base_Level);
 				}
-				free(*T_pBase);
-				free(*T_pTexture);
-			/* enf of transparent trace */
+			}
 		}
+
 	} else {
-		if(!verbose) printf("Stereograph for linux Version %s\n", STEREOGRAPH_VERSION);
+
+	        /* parametre error */
+	        if(!stereograph_verbose) printf("Stereograph for linux Version %s\n", STEREOGRAPH_VERSION);
 		fprintf(stderr, "NOTIFY: must specify at least a base and a texture file\nor define a texture width for a random texture.\nuse the -w option to define a texture width.\nnote that you CANNOT use random textures for transparent rendering.\n\n");
-		print_info();
-		return -1;
+		stereograph_print_info();
+		return STEREOGRAPH_ERROR;
 	}
+
+	return last_error;
+}
+
+
+int stereograph_gfx_clean(struct STEREOGRAPH_PARAMS *pParams) {
+
+        if(pParams->Renderer_Params.T_Layers <= 0) {
+
+                if(pParams->GFX_Texture->Data != NULL) {
+	                free(pParams->GFX_Texture->Data);
+		        pParams->GFX_Texture->Data = NULL;
+	        }        
+                if(pParams->GFX_Base->Data != NULL) {
+	                free(pParams->GFX_Base->Data);
+		        pParams->GFX_Base->Data = NULL;
+                }
+
+        } else {
+	        int z;
+
+		for(z = 0; z <= pParams->Renderer_Params.T_Layers; z++) {
+		        if(pParams->GFX_Texture[z].Data != NULL) {
+			        free(pParams->GFX_Texture[z].Data);
+				pParams->GFX_Texture[z].Data = NULL;
+			}        
+			if(pParams->GFX_Base[z].Data != NULL) {
+			        free(pParams->GFX_Base[z].Data);
+				pParams->GFX_Base[z].Data = NULL;
+			}
+		}
+
+        }
+
 	return 0;
 }
 
-int parse_args (int argc, char **argv) {
+
+int stereograph_gfx_process(struct STEREOGRAPH_PARAMS *pParams) {
+	int last_error = 0;
+
+	/* setting up renderer; */
+        if(stereograph_verbose) printf("initializing renderer...");
+	if(!(last_error = Renderer_Initialize( &(pParams->Renderer_Data), &(pParams->Renderer_Params)  ) )) {
+		int y, s;
+
+		if(stereograph_verbose) printf("success;\n");
+
+		/* verbose parametre info */
+		if(stereograph_verbose) printf("using following parametres (zadpexy): %i %i %f %f %f %i %i;\n", pParams->Renderer_Params.Zoom, pParams->Renderer_Params.AA, pParams->Renderer_Params.Distance, pParams->Renderer_Params.Front, pParams->Renderer_Params.Eyeshift, pParams->Renderer_Params.StartX, pParams->Renderer_Params.StartY);
+		if(stereograph_verbose && pParams->Renderer_Params.AAr)
+			printf("anti-artefacts feature enabled;\n");
+		if(stereograph_verbose && !pParams->Renderer_Params.Linear)
+			printf("linear rendering disabled;\n");
+		if(stereograph_verbose && pParams->Stereo_Triangles)
+			printf("triangle aid enabled, a pair will be added after rendering;\n");
+
+		/* here we actually render the stereogram */
+		/* the calls are similar for single and mutiple layers */
+		if(stereograph_verbose) printf("processing...");
+		for(y = 0, s = 0; (y < pParams->GFX_Base->Height); y++) {
+			Renderer_ProcessLine(y, &(pParams->Renderer_Data) );
+			/* print simple status points (without refresh) */
+			for( ; stereograph_verbose && (s < (58 * y / pParams->GFX_Base->Height)); s++)
+				printf(".");
+		}
+		if(stereograph_verbose) printf("completed;\n");
+
+	} else {
+	        /* initializing renderer failed if control reaches this point */
+	        if(stereograph_verbose)
+			printf("FAILED;\n");
+		else    	
+			fprintf(stderr, "initializing renderer...FAILED;\n");
+		switch (last_error) {
+			case RENDERER_ERROR_INIT_ILLEGAL_PARAMS :
+				fprintf(stderr, "illegal parametre;\n\n");
+				stereograph_print_info();
+				break;
+			case RENDERER_ERROR_INIT_ILLEGAL_BASE_TEX_RES :
+				fprintf(stderr, "width of texture file greater than the base;\nthis state is not processable;\ntry the -w option to resize the texture.\n");
+				break;
+			case RENDERER_ERROR_INIT_MEMORY_PROBLEM :
+				fprintf(stderr, "could not allocate memory.\n");
+				break;
+			case RENDERER_ERROR_INIT_ILLEGAL_T_LAYERS :
+				fprintf(stderr, "number of transparent layers exceeds max definition.\n");
+				break;
+		        default:
+				fprintf(stderr, "unkown error.\n");
+		}
+
+		/* we need to close the renderer anyway */
+		Renderer_Close( &(pParams->Renderer_Data) );
+
+		return STEREOGRAPH_ERROR;
+	}
+
+	/* post rendering manipulations */
+	if(pParams->Stereo_Triangles) {
+	        if(stereograph_verbose)
+			printf("adding triangles to the final image...");
+		GFX_AddTriangles(pParams->GFX_Stereo.Width / 2, 20 * pParams->Renderer_Params.Zoom, pParams->GFX_Texture->Width * pParams->Renderer_Params.Zoom, &(pParams->GFX_Stereo) );
+		if(stereograph_verbose)
+		        printf("done;\n");
+	}
+
+	if(stereograph_verbose) printf("writing stereogram to disk...");
+	if(!GFX_Write_File(pParams->Stereo_File_Name, pParams->Output_Format, &(pParams->GFX_Stereo) ) && stereograph_verbose)
+		printf("completed;\n");
+
+	/* the job is done, clean the mem */
+	Renderer_Close( &(pParams->Renderer_Data) );
+
+	return 0;
+}
+
+
+/* fill up parametre list with standard values */
+void stereograph_param_init(struct STEREOGRAPH_PARAMS *pParams) {
+        int z;
+
+	/* file io */
+        pParams->Base_File_Name = NULL;
+        pParams->Texture_File_Name = NULL;
+        pParams->Stereo_File_Name = NULL;
+        pParams->T_Base_File_Name = NULL;
+        pParams->T_Texture_File_Name = NULL;
+        pParams->Output_Format = 0;
+	/* GFX manipulators, generators */
+	pParams->Base_Invert = 0;
+	pParams->T_Base_Level = GFX_T_BACK_LEVEL;
+        pParams->Texture_Width_To_Use = 0;
+        pParams->Texture_Type = GFX_TEX_GRAYSCALE;
+	pParams->Stereo_Triangles = 0;
+	/* GFX datas */
+	for(z = 0; z < RENDERER_T_MAX_LAYERS; z++) {
+	        pParams->GFX_Base[z].Data = NULL;
+        	pParams->GFX_Texture[z].Data = NULL;
+	}
+       	pParams->GFX_Stereo.Data = NULL;
+        /* renderer, interface */
+        Renderer_Param_Init( &(pParams->Renderer_Params) );
+        Renderer_GFX_Init( &(pParams->Renderer_Data) , pParams->GFX_Base, pParams->GFX_Texture, &(pParams->GFX_Stereo) );
+}
+
+
+int stereograph_parse_args (struct STEREOGRAPH_PARAMS *pParams, int argc, char **argv) {
 	int z, s = 1;
 	
 	for(z = 1; z < argc; z++, s = 1)
 		while((z < argc) && ((argv[z][0] == '-') && (argv[z][s] != '\0')))
 			switch(argv[z][s]) {
 				case 'b' :
+				        /* read base file name(s) */
 					if (z < (argc - 1)) {
-						if(!pParam->T_layers && !texture_file_name) {
-							pParam->T_layers = 0;
-							while(argv[z + 2 + pParam->T_layers][0] != '-')
-								pParam->T_layers++;
+						if(!(pParams->Renderer_Params.T_Layers) && !(pParams->Texture_File_Name)) {
+						        /* for transparent rendering first of all the base files must be given */
+							pParams->Renderer_Params.T_Layers = 0;
+							while(argv[z + 2 + (pParams->Renderer_Params.T_Layers)][0] != '-')
+								pParams->Renderer_Params.T_Layers++;
 						}
-						if(pParam->T_layers) {
-							T_base_file_name = argv + ++z;
-							z += pParam->T_layers;
+						if(pParams->Renderer_Params.T_Layers) {
+							pParams->T_Base_File_Name = argv + (++z);
+							z += pParams->Renderer_Params.T_Layers;
 						}
-						base_file_name = argv[++z];
+						pParams->Base_File_Name = argv[++z];
 					} else {
 						fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
-						return -1;
+						return STEREOGRAPH_ERROR;
 					}
 					break;
 				case 't' :
+				        /* read the texture file name(s) */
 					if (z < (argc - 1)) {
-						if(!pParam->T_layers && !base_file_name) {
-							pParam->T_layers = 0;
-							while(argv[z + 2 + pParam->T_layers][0] != '-')
-								pParam->T_layers++;
+						if(!(pParams->Renderer_Params.T_Layers) && !(pParams->Base_File_Name)) {
+							pParams->Renderer_Params.T_Layers = 0;
+							while(argv[z + 2 + (pParams->Renderer_Params.T_Layers)][0] != '-')
+								pParams->Renderer_Params.T_Layers++;
 						}
-						if(pParam->T_layers) {
-							T_texture_file_name = argv + ++z;
-							z += pParam->T_layers;
+						if(pParams->Renderer_Params.T_Layers) {
+							pParams->T_Texture_File_Name = argv + (++z);
+							z += pParams->Renderer_Params.T_Layers;
 						}
-						texture_file_name = argv[++z];
+						pParams->Texture_File_Name = argv[++z];
 					} else {
 						fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
-						return -1;
+						return STEREOGRAPH_ERROR;
 					}
 					break;
 				case 'o' :
-					if (z < (argc - 1)) stereo_file_name = argv[++z]; else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+				        /* get output file name */
+					if (z < (argc - 1))
+					        pParams->Stereo_File_Name = argv[++z];
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'f' :
+				        /* get optional file output format */
 					if (z < (argc - 1)) {
 						if(!strcmp(argv[++z], "png"))
-							output_format = GFX_PNG;
+							pParams->Output_Format = GFX_IO_PNG;
 						else if(!strcmp(argv[z], "ppm"))
-							output_format = GFX_PPM;
+							pParams->Output_Format = GFX_IO_PPM;
 						else if(!strcmp(argv[z], "tga"))
-							output_format = GFX_TARGA;
+							pParams->Output_Format = GFX_IO_TARGA;
 						else
-							output_format = atoi(argv[z]);
-					} else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+							pParams->Output_Format = atoi(argv[z]);
+					} else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'x' :
-					if (z < (argc - 1)) pParam->Startx = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.StartX = atoi(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'y' :
-					if (z < (argc - 1)) pParam->Starty = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.StartY = atoi(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'd' :
-					if (z < (argc - 1)) pParam->Distance = (float) atof(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.Distance = (float) atof(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'p' :
-					if (z < (argc - 1)) pParam->Front = (float) atof(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.Front = (float) atof(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'e' :
-					if (z < (argc - 1)) pParam->Eyeshift = (float) atof(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.Eyeshift = (float) atof(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'a' :
-					if (z < (argc - 1)) pParam->AA = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.AA = atoi(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'z' :
-					if (z < (argc - 1)) pParam->Zoom = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Renderer_Params.Zoom = atoi(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'w' :
-					if (z < (argc - 1)) texture_width_to_use = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if (z < (argc - 1))
+					        pParams->Texture_Width_To_Use = atoi(argv[++z]);
+					else {
+					        fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
+						return STEREOGRAPH_ERROR;
+					}
 					break;
 				case 'l' :
 					if (z < (argc - 1)) {
 						if(!strcmp(argv[++z], "top"))
-							pParam->T_level = T_TOP_LEVEL;
+							pParams->T_Base_Level = GFX_T_TOP_LEVEL;
 						else if(!strcmp(argv[z], "back"))
-							pParam->T_level = T_BACK_LEVEL;
+							pParams->T_Base_Level = GFX_T_BACK_LEVEL;
 						else if(!strcmp(argv[z], "none"))
-							pParam->T_level = T_NO_LEVEL;
+							pParams->T_Base_Level = GFX_T_NO_LEVEL;
 						else
-							pParam->T_level = atoi(argv[z]);
+							pParams->T_Base_Level = atoi(argv[z]);
 					} else {
-						fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1;
+						fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return STEREOGRAPH_ERROR;
 					}
 					break;
 				case 'I' :
-					pParam->Invert = 1;
+					pParams->Base_Invert = 1;
 					s++;
 					break;
+			        /* get random texture params */
 				case 'C' :
-					random_texture_type = TEX_COLORED;
+					pParams->Texture_Type = GFX_TEX_COLORED;
 					s++;
 					break;
 				case 'G' :
-					random_texture_type = TEX_GRAYSCALE;
+					pParams->Texture_Type = GFX_TEX_GRAYSCALE;
 					s++;
 					break;
 				case 'M' :
-					random_texture_type = TEX_BW;
+					pParams->Texture_Type = GFX_TEX_BW;
 					s++;
 					break;
 				case 'S' :
-					random_texture_type = TEX_SINLINE;
+					pParams->Texture_Type = GFX_TEX_SINLINE;
 					s++;
 					break;
+				/* random textures end here */
 				case 'R' :
-					pParam->AAr = 1;
+					pParams->Renderer_Params.AAr = 1;
 					s++;
 					break;
 				case 'L' :
-					pParam->Linear = 0;
+					pParams->Renderer_Params.Linear = 0;
 					s++;
 					break;
 				case 'A' :
-					pParam->Triangles = 1;
+					pParams->Stereo_Triangles = 1;
 					s++;
 					break;
 				case 'v' :
-					verbose = 1;
+					stereograph_verbose = 1;
 					s++;
 					break;
 				/* obsolete, for compatibility purpose, only temporary */
 				case 'T' :
 					fprintf(stderr, "the T option is obsolete, please take a look to the ChangeLog or the README.\n");
-					if(z > 1) { fprintf(stderr, "invalid argument '%c';\nthe T descriptor must PRECEED any argument!\n", argv[z][s]);  return -1; }
-					if (z < (argc - 1)) pParam->T_layers = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return -1; }
+					if(z > 1) { fprintf(stderr, "invalid argument '%c';\nthe T descriptor must PRECEED any argument!\n", argv[z][s]);  return STEREOGRAPH_ERROR; }
+					if (z < (argc - 1)) pParams->Renderer_Params.T_Layers = atoi(argv[++z]); else { fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);  return STEREOGRAPH_ERROR; }
 					break;
 				case 'V' :
+				        /* print version info */
 					printf("stereograph-%s\n", STEREOGRAPH_VERSION);
-					return -2;
+					return STEREOGRAPH_QUIT;
 				default:
+				        /* default invalid argument message */
 					fprintf(stderr, "invalid argument '%c';\n", argv[z][s]);
-					return -1;
+					return STEREOGRAPH_ERROR;
 			}
 	return 0;
 }
+
+
+
+void stereograph_print_info(void) {
+	printf("SYNOPSIS\n  stereograph [OPTIONS] -b [base] [-t [texture]] [-w n]\n              [-o [output]] [-f png/ppm/tga] [-l none/back/top]\n\n");
+	printf("OPTIONS\n  -a anti-aliasing     -z zoom               (quality)\n  -d distance          -p front factor                    \n                       -e eye shift          (perspective)\n  -x texture insert x  -y texture insert y   (layout)\n  -w texture width to use\n  -M/-G/-C generate a monochrome, grayscale or colored\n  -S generates an experimental random texture\n           random texture (no transparency)\n  -A add a pair of triangles                 (aid)\n  -R this flag enables the anti-artefact feature\n  -L disables the linear rendering algorithm\n  -I invert the base\n  -l sets the level adjust mode for transparent rendering\n  -f defines the output format\n  -v you should know this flag :)\n  -V display version\n\n");
+}
+
+

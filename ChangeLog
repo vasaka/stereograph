@@ -1,3 +1,8 @@
+  2001-08-18  * reorganized data and code structures massively;
+	      * extended code documentation, primarily in the header files;
+	      * no functional changes;
+	      * release 0.31a;
+
   2000-12-26  * implemented front-distance-relative linear rendering;
 		this results in a new interpretation of the former
 		distance values;

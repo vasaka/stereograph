@@ -1,6 +1,6 @@
-/* Stereograph 0.30a, 26/12/2000;
+/* Stereograph 0.31a, 18/08/2001;
  * Graphics I/O functions;
- * Copyright (c) 2000 by Fabian Januszewski <fabian.linux@januszewski.de>
+ * Copyright (c) 2000-2001 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,8 +25,6 @@
 #include <time.h>
 #include <png.h>
 
-/* uncomment the following line to compile for big endian machines */
-//#define BIG_ENDIAN
 
 #include "renderer.h"
 #include "gfxio.h"
@@ -37,119 +35,128 @@
 #define PI 3.14159265358979
 
 /* add a pair of triangles to a stereogram */
-int Add_Triangles(int x, int size, int width, struct GFX_DATA *gfx) {
+int GFX_AddTriangles(int x, int size, int width, struct GFX_DATA *gfx) {
 	int z, y;
 	for(y = 0; (y < size) && (y < gfx->Height); y++)
-		for(z = 0; (z < size - 2*y); z++)
-			if(((y + x - width/2 + z) >= 0) && ((y + x + width/2 + z) < gfx->Width))
-				gfx->Data[y * gfx->Width + y + x - width/2 + z] = gfx->Data[y * gfx->Width + y + x + width/2 + z] = 0;
+		for(z = 0; (z < (size - (y * 2))); z++)
+			if(((y + x - (width/2) + z) >= 0) && ((y + x + width/2 + z) < gfx->Width))
+				gfx->Data[(y * gfx->Width) + y + x - width/2 + z] = gfx->Data[(y * gfx->Width) + y + x + width/2 + z] = 0;
+
 	return 0;
 }
 
 
 /* generates a random texture */
-int Generate_Random_Texture(struct GFX_DATA *gfx, int width, int height, int type) {
+int GFX_Generate_RandomTexture(struct GFX_DATA *gfx, int width, int height, int type) {
 	int a = 0, z;
-	gfx->Data = (int*) malloc(width*height*sizeof(int));
+	gfx->Data = (int*) malloc(width * height * sizeof(int));
 	if(gfx->Data) {
 		srand((unsigned int)time(NULL));
 		gfx->Width = width;
 		gfx->Height = height;
 		switch(type) {
-			case TEX_BW:
-				for(z = 0; z < (height*width); z++)
+			case GFX_TEX_BW:
+				for(z = 0; z < (height * width); z++)
 					gfx->Data[z] = (rand()&1) * 65793 * 255;
 				break;
-			case TEX_GRAYSCALE:
-				for(z = 0; z < (height*width); z++)
+			case GFX_TEX_GRAYSCALE:
+				for(z = 0; z < (height * width); z++)
 					gfx->Data[z] = (rand()&255) * 65793;
 				break;
-			case TEX_COLORED:
-				for(z = 0; z < (height*width); z++)
+			case GFX_TEX_COLORED:
+				for(z = 0; z < (height * width); z++)
 					gfx->Data[z] = (rand()&(65793 * 255));
 				break;
-                        case TEX_SINLINE:
-                                a = Generate_Sinline_Texture(gfx);
+                        case GFX_TEX_SINLINE:
+                                a = GFX_Generate_SinlineTexture(gfx);
                                 break;
         		default:
 				free(gfx->Data);
 				gfx->Data = NULL;
-				if (verbose) printf("FAILED\n");
+				if (stereograph_verbose) printf("FAILED\n");
 				fprintf(stderr, "unsupported random texture type;\n");
-				a = -1;
+				a = GFX_ERROR_UNSUPP_RANDOMTEX;
 		}
 	} else {
-		if (verbose) printf("FAILED\n");
+		if (stereograph_verbose) printf("FAILED\n");
 		fprintf(stderr, "could not allocate memory for random texture;\n");
-		a = -3;
+		a = GFX_ERROR_MEMORY_PROBLEM;
 	}
-	if(verbose && !a) printf("done;\n");
+	if(stereograph_verbose && !a) printf("done;\n");
+
 	return a;
 }
 
 
 /* resizes a texture to the width of width pixels */
-int Resize_GFX(struct GFX_DATA *gfx, int width) {
+int GFX_Resize(struct GFX_DATA *gfx, int width) {
 	int y;
 	int *temp_gfx;
 
-	if(verbose) printf("resizing texture...");
-	temp_gfx = (int*) malloc(gfx->Height * width * sizeof(int));
-	if(!temp_gfx) {
-		if(verbose) printf("FAILED;\n");
-		fprintf(stderr, "error allocating memory for texture!\n");
-		return -3;
-	} else
-		for(y = 0; (y < gfx->Height); y++)
-			memcpy(temp_gfx + y * width, gfx->Data + gfx->Width * y, width*sizeof(int));
-	free(gfx->Data);
-	gfx->Data = temp_gfx;
-	gfx->Width = width;
-	if(verbose) printf("done;\n");
+	/* only resize the gfx if necessary */
+	if((width > 0) && (gfx->Width >= width)) {
+
+	        if(stereograph_verbose) printf("resizing texture...");
+		temp_gfx = (int*) malloc(gfx->Height * width * sizeof(int));
+		if(!temp_gfx) {
+		        if(stereograph_verbose) printf("FAILED;\n");
+			fprintf(stderr, "error allocating memory for texture!\n");
+			return GFX_ERROR_MEMORY_PROBLEM;
+		} else
+		        for(y = 0; (y < gfx->Height); y++)
+			        memcpy(temp_gfx + y * width, gfx->Data + gfx->Width * y, width * sizeof(int));
+		free(gfx->Data);
+		gfx->Data = temp_gfx;
+		gfx->Width = width;
+		if(stereograph_verbose) printf("done;\n");
+
+	}
+
 	return 0;
 }
 
 
-/* inverts a base image */
-int Invert_GFX(struct GFX_DATA *gfx) {
+/* inverts a base (gray scaled) image */
+int GFX_Invert(struct GFX_DATA *gfx) {
 	int z, r = 0, g = 0, b = 0;
 
-	if(verbose) printf("inverting base...");
+	if(stereograph_verbose) printf("inverting base...");
 	for(z = 0; z < (gfx->Width * gfx->Height); z++) {
-		r = 255 -  (gfx->Data[z]          & 255);
-		g = 255 - ((gfx->Data[z] /   256) & 255);
-		b = 255 - ((gfx->Data[z] / 65536) & 255);
-		gfx->Data[z] = r + (b * 256) + (g * 65536);
+		r = 255 -  (gfx->Data[z]        & 255);
+		g = 255 - ((gfx->Data[z] >>  8) & 255);
+		b = 255 - ((gfx->Data[z] >> 16) & 255);
+		gfx->Data[z] = r + (g << 8) + (b << 16);
 	}
-	if(verbose) printf("done;\n");
+	if(stereograph_verbose) printf("done;\n");
+
 	return 0;
 }
 
 
 /* adjusts the base levels for transparent rendering */
-int T_adjust_level(struct GFX_DATA **T_gfx, int T_layers, int T_level) {
+int GFX_T_AdjustLevel(struct GFX_DATA *T_gfx, int T_layers, int T_level) {
 	int t, z, r_t = 0, g_t = 0, b_t = 0, r = 0, g = 0, b = 0;
 
-	if(verbose) printf("ajdusting levels...");
+	if(stereograph_verbose) printf("ajdusting levels...");
 	for(t = 1; t < T_layers; t++)
-		for(z = 0; z < (T_gfx[0]->Width * T_gfx[0]->Height); z++) {
-			r =  T_gfx[t - 1]->Data[z]          & 255;
-			g = (T_gfx[t - 1]->Data[z] /   256) & 255;
-			b = (T_gfx[t - 1]->Data[z] / 65536) & 255;
-			r_t =  T_gfx[t]->Data[z]          & 255;
-			g_t = (T_gfx[t]->Data[z] /   256) & 255;
-			b_t = (T_gfx[t]->Data[z] / 65536) & 255;
+		for(z = 0; z < (T_gfx[0].Width * T_gfx[0].Height); z++) {
+			r =  T_gfx[t - 1].Data[z]        & 255;
+			g = (T_gfx[t - 1].Data[z] >>  8) & 255;
+			b = (T_gfx[t - 1].Data[z] >> 16) & 255;
+			r_t =  T_gfx[t].Data[z]        & 255;
+			g_t = (T_gfx[t].Data[z] >>  8) & 255;
+			b_t = (T_gfx[t].Data[z] >> 16) & 255;
 			switch (T_level) {
-				case T_NO_LEVEL:
+				case GFX_T_NO_LEVEL:
 					break;
-				case T_BACK_LEVEL:
+				case GFX_T_BACK_LEVEL:
 					if(!r_t && !g_t && !r_t) {
 						r_t = r;
 						g_t = g;
 						b_t = b;
 					}
 					break;
-				case T_TOP_LEVEL:
+				case GFX_T_TOP_LEVEL:
 					if((r_t + g_t + r_t) < (r + g + b)) {
 						r_t = r;
 						g_t = g;
@@ -157,19 +164,20 @@ int T_adjust_level(struct GFX_DATA **T_gfx, int T_layers, int T_level) {
 					}
 					break;
 				default :
-					if(verbose) printf("FAILED\n");
+					if(stereograph_verbose) printf("FAILED\n");
 					fprintf(stderr, "Unimplemented transparency level;\n");
-					return -1;
+					return GFX_ERROR_UNSUPP_T_LEVEL;
 			}
-			T_gfx[t]->Data[z] = r_t + (b_t * 256) + (g_t * 65536);
+			T_gfx[t].Data[z] = r_t + (g_t << 8) + (b_t << 16);
 		}
-	if(verbose) printf("done;\n");
+	if(stereograph_verbose) printf("done;\n");
+
 	return 0;
 }
 
 
 /* reads a png or targa file */
-int Read_Gfx_File (char *file_name, struct GFX_DATA *gfx)
+int GFX_Read_File (char *file_name, struct GFX_DATA *gfx)
 {
 	int a;
 	FILE *ifile = NULL;
@@ -178,39 +186,40 @@ int Read_Gfx_File (char *file_name, struct GFX_DATA *gfx)
 	ifile = fopen(file_name, "r");
 
 	if(ifile == NULL) {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "loading gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "loading gfx data...FAILED;\n");
 		fprintf(stderr, "cannot open file '%s'!\n", file_name);
-		return -1;
+		return GFX_ERROR_READ_ERROR;
 	} else {
-		a = identify_GFX_file(ifile, check_header);
+		a = GFX_Identify_File(ifile, check_header);
 		switch (a) {
-			case GFX_PNG :
-				a = Read_PNG(ifile, check_header, gfx);
+			case GFX_IO_PNG :
+				a = GFX_Read_PNG(ifile, check_header, gfx);
 				break;
-			case GFX_TARGA :
-				a = Read_TARGA(ifile, check_header, gfx);
+			case GFX_IO_TARGA :
+				a = GFX_Read_TARGA(ifile, check_header, gfx);
 				break;
-			case GFX_PPM :
-				a = Read_PPM(ifile, check_header, gfx);
+			case GFX_IO_PPM :
+				a = GFX_Read_PPM(ifile, check_header, gfx);
 				break;
 		}
 	}
 
 	fclose(ifile);
 	ifile = NULL;
-	if(!a && verbose) printf("gfx data read (%i*%i);\n", gfx->Width, gfx->Height);
+	if(!a && stereograph_verbose) printf("gfx data read (%i*%i);\n", gfx->Width, gfx->Height);
+
 	return a;
 }
 
 
 /* writes a png, ppm or targa file */
-int Write_Gfx_File (char *file_name, int output_format, struct GFX_DATA *gfx)
+int GFX_Write_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 {
 	int a;
 	FILE *ofile = NULL;
 
 
-	if(verbose) printf("saving '%s' (%i*%i)...", file_name, gfx->Width, gfx->Height);
+	if(stereograph_verbose) printf("saving '%s' (%i*%i)...", file_name, gfx->Width, gfx->Height);
 
 	if(!file_name)
 		ofile = stdout;
@@ -218,43 +227,44 @@ int Write_Gfx_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 		ofile = fopen(file_name, "w+");
 
 	if(ofile == NULL) {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
 		fprintf(stderr, "cannot create file %s!\n", file_name);
 		return -1;
 	} else
 
 	switch (output_format) {
-		case GFX_TARGA :
-			a = Write_TARGA(ofile, gfx);
+		case GFX_IO_TARGA :
+			a = GFX_Write_TARGA(ofile, gfx);
 			break;
-		case GFX_PNG :
-			a = Write_PNG(ofile, gfx);
+		case GFX_IO_PNG :
+			a = GFX_Write_PNG(ofile, gfx);
 			break;
-		case GFX_PPM :
-			a = Write_PPM(ofile, gfx);
+		case GFX_IO_PPM :
+			a = GFX_Write_PPM(ofile, gfx);
 			break;
 	        default :
 			if(strlen(file_name) >= 4) {
 				if(!strcmp(file_name + strlen(file_name) - 4, ".tga"))
-					a = Write_TARGA(ofile, gfx);
+					a = GFX_Write_TARGA(ofile, gfx);
 				else if(!strcmp(file_name + strlen(file_name) - 4, ".png"))
-					a = Write_PNG(ofile, gfx);
+					a = GFX_Write_PNG(ofile, gfx);
 				else if(!strcmp(file_name + strlen(file_name) - 4, ".ppm"))
-					a = Write_PPM(ofile, gfx);
+					a = GFX_Write_PPM(ofile, gfx);
 				else {
-					if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
+					if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
 					fprintf(stderr, "unsupported output format!\n");
-					a = -2;
+					a = GFX_ERROR_UNSUPP_FORMAT;
 				}
 			} else {
-				if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
+				if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
 				fprintf(stderr, "unsupported output format!\n");
-				a = -2;
+				a = GFX_ERROR_UNSUPP_FORMAT;
 			}       	
 	}
 
 	fclose(ofile);
 	ofile = NULL;
+
 	return a;
 }
 
@@ -262,29 +272,30 @@ int Write_Gfx_File (char *file_name, int output_format, struct GFX_DATA *gfx)
 
 
 /*** gfxio internals ***/
-int identify_GFX_file(FILE *ifile, unsigned char *check_header) {
+int GFX_Identify_File(FILE *ifile, unsigned char *check_header) {
 
 	if(fread(check_header, sizeof(char), 2, ifile) != 2) {
-		if(verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 		fprintf(stderr, "cannot read header! (file corrupt?)\n");
-		return -2;
+		return GFX_ERROR_READ_ERROR;
 	} else if((check_header[0] == 'P') && ((check_header[1] == '3') || (check_header[1] == '6')))
-		return GFX_PPM;
+		return GFX_IO_PPM;
 	else {
 		if(fread(check_header + 2, sizeof(char), 6, ifile) != 6) {
-			if(verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+			if(stereograph_verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 			fprintf(stderr, "cannot read header! (file corrupt?)\n");
-			return -2;
+			return GFX_ERROR_READ_ERROR;
 		} else {
 		        if(!png_sig_cmp(check_header, 0, 8))
-				return GFX_PNG;
+				return GFX_IO_PNG;
 			else
-				return GFX_TARGA;
+				return GFX_IO_TARGA;
 		}
 	}
-	if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
+	if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
 	fprintf(stderr, "cannot identify gfx file, unsupported format!\n");
-	return -1;
+
+	return GFX_ERROR_UNSUPP_FORMAT;
 }
 
 int skip_space_n_comments(FILE *ifile) {
@@ -293,6 +304,7 @@ int skip_space_n_comments(FILE *ifile) {
 		if(a == '#')
 			while(fgetc(ifile) != 10);
 	ungetc(a, ifile);
+
         return 0;
 }
 
@@ -301,13 +313,13 @@ int get_dec(FILE *ifile) {
 	c = 0;
 	
 	while(isdigit(a = fgetc(ifile)))
-		c = c*10 + (a - '0');
+		c = c * 10 + (a - '0');
 	ungetc(a, ifile);
 
 	return c;
 }
 
-int Read_PPM (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
+int GFX_Read_PPM (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 {
 	int a, z, c_max;
 
@@ -318,9 +330,9 @@ int Read_PPM (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 
 	gfx->Data = (int*)malloc(gfx->Width*gfx->Height*sizeof(int));
 	if(!gfx->Data) {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 		fprintf(stderr, "error allocating memory for image dimensions of %i * %i pixels in 32 bit\n", gfx->Width, gfx->Height);
-		return -3;
+		return GFX_ERROR_MEMORY_PROBLEM;
 	}
 
 	skip_space_n_comments(ifile);
@@ -331,27 +343,29 @@ int Read_PPM (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 			while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
 			gfx->Data[z] = get_dec(ifile) * c_max;
 			while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
-			gfx->Data[z] += (get_dec(ifile) * c_max) * 256;
+			gfx->Data[z] += (get_dec(ifile) * c_max) << 8;
 			while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
-			gfx->Data[z] += (get_dec(ifile) * c_max) * 65536;
+			gfx->Data[z] += (get_dec(ifile) * c_max) << 16;
 		}
 	else if (check_header[1] == '6') {
 		while(isspace(a = fgetc(ifile))); ungetc(a, ifile);
 		for(z = 0; z < (gfx->Width * gfx->Height); z++) {
 			gfx->Data[z] = fgetc(ifile) * c_max;
-			gfx->Data[z] += (fgetc(ifile) * c_max) * 256;
-			gfx->Data[z] += (fgetc(ifile) * c_max) * 65536;
+			gfx->Data[z] += (fgetc(ifile) * c_max) << 8;
+			gfx->Data[z] += (fgetc(ifile) * c_max) << 16;
 		}
 	} else {
-		if (verbose) printf("FAILED\n");
+		if (stereograph_verbose) printf("FAILED\n");
 		fprintf(stderr, "unknown PPM magic!\n");
+		return GFX_ERROR_UNSUPP_FORMAT;
 	}
 
 	return 0;
+
 }
 
 
-int Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
+int GFX_Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 {
 	png_voidp user_error_ptr = NULL;
 	png_structp png_ptr;
@@ -370,31 +384,31 @@ int Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 		/* initializing */
 		png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, user_error_ptr, NULL, NULL);
 		if (!png_ptr) {
-        		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
+        		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
 	        	fprintf(stderr, "cannot create png read struct!\n");
-			return -1;
+			return GFX_ERROR_LIBPNG;
 		}
 		info_ptr = png_create_info_struct(png_ptr);
 		if (!info_ptr) {
 			png_destroy_read_struct(&png_ptr, (png_infopp)NULL, (png_infopp)NULL);
-        		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
+        		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
 	        	fprintf(stderr, "cannot create png info struct!\n");
-			return -1;
+			return GFX_ERROR_LIBPNG;
 		}
 		end_info = png_create_info_struct(png_ptr);
 		if (!end_info) {
 			png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
-        		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
+        		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
 	        	fprintf(stderr, "cannot create png (end) info struct!\n");
-			return -1;
+			return GFX_ERROR_LIBPNG;
 		}
 		
 		/* libpng error handling */
 		if (setjmp(png_ptr->jmpbuf)) {
 			png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-        		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
+        		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED\n");
 	        	fprintf(stderr, "libpng reported an error!\n");
-			return -1;
+			return GFX_ERROR_LIBPNG;
 		}
 		
 
@@ -448,12 +462,12 @@ int Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 		gfx->Width = png_get_image_width(png_ptr, info_ptr);
 		gfx->Height = png_get_image_height(png_ptr, info_ptr);
 
-		gfx->Data = (int*)malloc(gfx->Width*gfx->Height*sizeof(int));
+		gfx->Data = (int*)malloc( gfx->Width * gfx->Height * sizeof(int) );
 		if(!gfx->Data) {
 			png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-			if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+			if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 			fprintf(stderr, "error allocating memory for image dimensions of %i * %i pixels in 32 bit\n", gfx->Width, gfx->Height);
-			return -3;
+			return GFX_ERROR_MEMORY_PROBLEM;
 		}
 
 		/* alternatively read it row by row, interlacing as expected */
@@ -466,7 +480,7 @@ int Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 	return 0;
 }
 
-int Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
+int GFX_Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
 {
 	png_voidp user_error_ptr = NULL;
 	png_structp png_ptr;
@@ -477,24 +491,24 @@ int Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
 	/* initializing */
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, user_error_ptr, NULL, NULL);
 	if (!png_ptr) {
-       		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED\n");
+       		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED\n");
         	fprintf(stderr, "cannot create png write struct!\n");
-		return -1;
+		return GFX_ERROR_LIBPNG;
 	}
 	info_ptr = png_create_info_struct(png_ptr);
 	if (!info_ptr) {
 		png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
-       		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED\n");
+       		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED\n");
         	fprintf(stderr, "cannot create png info struct!\n");
-		return -1;
+		return GFX_ERROR_LIBPNG;
 	}
 		
 	/* libpng error handling */
 	if (setjmp(png_ptr->jmpbuf)) {
 		png_destroy_write_struct(&png_ptr, &info_ptr);
-       		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED\n");
+       		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED\n");
         	fprintf(stderr, "libpng reported an error!\n");
-		return -1;
+		return GFX_ERROR_LIBPNG;
 	}
 		
 	/* setting up file pointer */
@@ -515,7 +529,7 @@ int Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
 	*/
 
 	for(z = 0; z < gfx->Height; z++)
-                png_write_row(png_ptr, (void *) (gfx->Data + z*gfx->Width));
+                png_write_row(png_ptr, (void *) (gfx->Data + z * gfx->Width));
 
 	png_write_end(png_ptr, NULL);
 
@@ -525,7 +539,7 @@ int Write_PNG (FILE *ofile, struct GFX_DATA *gfx)
 	return 0;
 }
 
-int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
+int GFX_Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 {
 	/* TARGA uses the Intel format for integer coding (low byte first) */
 
@@ -537,9 +551,9 @@ int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 
 	/* reading all header information */
 	if(fread(header + 8, sizeof(char), 10, ifile) != 10) {
-		if(verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED!\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 		fprintf(stderr, "cannot read header! (file corrupt?)\n");
-		return -2;
+		return GFX_ERROR_READ_ERROR;
 	}
 
 	/* general measurements */
@@ -547,12 +561,12 @@ int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 	gfx->Height = (int)header[14] + (int)header[15]*256;
 	gfx->Data = (int*)malloc(gfx->Width*gfx->Height*sizeof(int));
 	if(!gfx->Data) {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 		fprintf(stderr, "error allocating memory for image dimensions of %i * %i pixels in 32 bit\n", gfx->Width, gfx->Height);
 		fprintf(stderr, "debug header follows:\n");
 		for(x = 0; x < 20; x += 4)
 			fprintf(stderr, " %i, %i, %i, %i;\n", (int)header[x], (int)header[x + 1], (int)header[x + 2], (int)header[x + 3]);
-		return -3;
+		return GFX_ERROR_MEMORY_PROBLEM;
 	}
 
 	/* reading image identification field */
@@ -560,10 +574,10 @@ int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 		getc(ifile);
 
 	/* reading palette data */
-	if((header[1] != 0) && ((header[5] + header[6]*256) > 0) && (((header[3] + header[4]*256) + (header[5] + header[6]*256)) <= 256)) {
-		palette = (int*)malloc(((header[3] + header[4]*256) + (header[5] + header[6]*256)) * sizeof(int));
-		for(x = header[3] + header[4]*256; (x < (header[5] + header[6]*256)); x++)
-			Read_TARGA_RGB(ifile, (int)header[7], NULL, palette + x);
+	if((header[1] != 0) && ((header[5] + (header[6] << 8)) > 0) && (((header[3] + (header[4] << 8)) + (header[5] + (header[6] << 8))) <= 256)) {
+		palette = (int*)malloc(((header[3] + (header[4] << 8)) + (header[5] + (header[6] << 8))) * sizeof(int));
+		for(x = header[3] + (header[4] << 8); (x < (header[5] + (header[6] << 8))); x++)
+			GFX_Read_TARGA_RGB(ifile, (int)header[7], NULL, palette + x);
 	} else
 		palette = NULL;
 
@@ -573,22 +587,22 @@ int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 			for(y = 0; y < gfx->Height; y++) {
 				if(header[17] & 16)
 					for(x = gfx->Width - 1; x >= 0; x--)
-						Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
+						GFX_Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
 				else
 					for(x = 0; x < gfx->Width; x++)
-						Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
+						GFX_Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
 			}
 		} else {
 			for(y = gfx->Height - 1; y >= 0; y--) {
 				if(header[17] & 16)
 					for(x = gfx->Width - 1; x >= 0; x--)
-						Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
+						GFX_Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
 				else
 					for(x = 0; x < gfx->Width; x++)
-						Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
+						GFX_Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
 			}
 		}
-		/*if(verbose) printf("gfx data read (%i*%i);\n", gfx->Width, gfx->Height);*/
+		/*if(stereograph_verbose) printf("gfx data read (%i*%i);\n", gfx->Width, gfx->Height);*/
 		free(palette);
 		return 0;
 	} else if(((header[2] == 10) && (header[16] >= 16)) || (((header[2] == 9) || header[2] == 11) && (header[16] == 8))) {
@@ -596,7 +610,7 @@ int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 		for(z = 0; ((l = getc(ifile)) != EOF) && (z < (gfx->Height * gfx->Width)); ) {
 			if(l & 128) { /* compressed data follows */
 				l &= 127; /* extracting length */
-				Read_TARGA_RGB(ifile, (int)header[16], palette, &c);
+				GFX_Read_TARGA_RGB(ifile, (int)header[16], palette, &c);
 				for(s = 0; (s <= l); s++) {
 					x = z % gfx->Width;
 					y = (z - x) / gfx->Width;
@@ -619,26 +633,26 @@ int Read_TARGA (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx)
 					if(!(header[17] & 32))
 						y = gfx->Height - 1 - y;
 					if((x < gfx->Width) && (y < gfx->Height) && (x >= 0) && (y >= 0))
-						Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
+						GFX_Read_TARGA_RGB(ifile, (int)header[16], palette, gfx->Data + (y * gfx->Width) + x);
 					else
 						fprintf(stderr, "(%i, %i) => error\n", x, y);
 					z++;
 				}
 			}
 		}
-		/*if(verbose) printf("gfx data read (%i*%i);\n", gfx->Width, gfx->Height);*/
+		/*if(stereograph_verbose) printf("gfx data read (%i*%i);\n", gfx->Width, gfx->Height);*/
 		free(palette);
 		return 0;
 	} else {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "reading gfx data...FAILED;\n");
 		fprintf(stderr, "Unsupported Targa Data Format %i@%i;\nOnly TARGA types 1, 2, 3 (uncompressed) and 9, 10, 11 (RLE) are supported;\n", header[2], header[16]);
 		free(palette);
-		return -1;
+		return GFX_ERROR_UNSUPP_FORMAT;
 	}
 }
 
 
-int Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c) {
+int GFX_Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c) {
 	static int a, r, g, b, z1, z2;
 	a = 0;
 	if(bits == 8) {
@@ -650,15 +664,15 @@ int Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c) {
 			z1 = getc(ifile);
 			z2 = getc(ifile);
 			r = (int)((255.0/31.0) * (float)((z1 & 124) / 4) );  /* 124 = 64 + 32 + 16 + 8 + 4 */
-			g = (int)((255.0/31.0) * (float)(((z1 & 3) * 8) | ((z2 & 224) / 32)) );  /* 224 = 128 + 64 + 32 */
+			g = (int)((255.0/31.0) * (float)(((z1 & 3) << 3) | ((z2 & 224) / 32)) );  /* 224 = 128 + 64 + 32 */
 			b = (int)((255.0/31.0) * (float)(z2 & 31) );
-			(*c) = r + (g * 256) + (b * 65536);
+			(*c) = r + (g << 8) + (b << 16);
 			a = z1 & 128;
 		} else {
 			r = getc(ifile);
 			g = getc(ifile);
 			b = getc(ifile);
-			(*c) = r + (g * 256) + (b * 65536);
+			(*c) = r + (g << 8) + (b << 16);
 			if(bits == 32)
 				a = getc(ifile);
 		}
@@ -666,7 +680,7 @@ int Read_TARGA_RGB(FILE *ifile, int bits, int *palette, int *c) {
 }
 
 /* writes all gfx data to stdout, preceded by the resolution of gfx data - everything 32 bit wide */
-int Write_PPM (FILE *ofile, struct GFX_DATA *gfx)
+int GFX_Write_PPM (FILE *ofile, struct GFX_DATA *gfx)
 {
 	int a, x, y;
 
@@ -677,19 +691,19 @@ int Write_PPM (FILE *ofile, struct GFX_DATA *gfx)
 	for(y = 0; (y < gfx->Height) && (a != EOF); y++)
 		for(x = 0; (x < gfx->Width) && (a != EOF); x++)	{
 			putc(gfx->Data[y * gfx->Width + x] & 255, ofile);
-			putc((gfx->Data[y * gfx->Width + x] / 256) & 255, ofile);
-			a = putc((gfx->Data[y * gfx->Width + x] / 65536) & 255, ofile);
+			putc((gfx->Data[y * gfx->Width + x] >> 8) & 255, ofile);
+			a = putc((gfx->Data[y * gfx->Width + x] >> 16) & 255, ofile);
 		}
 	if(a != EOF) {
 		return 0;
 	} else {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
 			fprintf(stderr, "cannot write to file! (disk full?)\n");
-		return -1;
+		return GFX_ERROR_WRITE_ERROR;
 	}
 }
 
-int Write_TARGA (FILE *ofile, struct GFX_DATA *gfx)
+int GFX_Write_TARGA (FILE *ofile, struct GFX_DATA *gfx)
 {
 	int a, x, y;
 	/* standard TARGA header consists of 18 bytes */
@@ -713,10 +727,10 @@ int Write_TARGA (FILE *ofile, struct GFX_DATA *gfx)
 	putc(0, ofile);
 	/* width, low byte first */
 	putc(gfx->Width & 255, ofile);
-	putc((gfx->Width / 256) & 255, ofile);
+	putc((gfx->Width >> 8) & 255, ofile);
 	/* height */
 	putc(gfx->Height & 255, ofile);
-	putc((gfx->Height / 256) & 255, ofile);
+	putc((gfx->Height >> 8) & 255, ofile);
 	/* bits per pixel */
 	putc(32-8, ofile);
 	/* Image Descriptor Flags */
@@ -727,15 +741,15 @@ int Write_TARGA (FILE *ofile, struct GFX_DATA *gfx)
 	for(y = gfx->Height - 1; (y >= 0) && (a != EOF); y--)
 		for(x = 0; (x < gfx->Width) && (a != EOF); x++)	{
 			putc(gfx->Data[y * gfx->Width + x] & 255, ofile);
-			putc((gfx->Data[y * gfx->Width + x] / 256) & 255, ofile);
-			a = putc((gfx->Data[y * gfx->Width + x] / 65536) & 255, ofile);
+			putc((gfx->Data[y * gfx->Width + x] >> 8) & 255, ofile);
+			a = putc((gfx->Data[y * gfx->Width + x] >> 16) & 255, ofile);
 		}
 	if(a != EOF) {
 		return 0;
 	} else {
-		if(verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
+		if(stereograph_verbose) printf("FAILED;\n"); else fprintf(stderr, "writing gfx data...FAILED;\n");
 			fprintf(stderr, "cannot write to file! (disk full?)\n");
-		return -1;
+		return GFX_ERROR_WRITE_ERROR;
 	}
 }
 
@@ -748,19 +762,19 @@ int fdata_to_GFX(float *datafield[3], struct GFX_DATA *gfx) {
 	for(z = 0; z < (gfx->Width*gfx->Height); z++) {
 		if(datafield[3][z] > a) {
 			gfx->Data[z] = (int)(datafield[2][z] * (rand()&255));
-			gfx->Data[z] += (int)(datafield[0][z] * (rand()&255))*256;
-			gfx->Data[z] += (int)(datafield[1][z] * (rand()&255))*65536;
+			gfx->Data[z] += (int)(datafield[0][z] * (rand()&255)) << 8;
+			gfx->Data[z] += (int)(datafield[1][z] * (rand()&255)) << 16;
 		} else if (datafield[3][z] > b) {
 			gfx->Data[z] = (int)(datafield[0][z] * 255.0);
-			gfx->Data[z] += (int)(datafield[1][z] * 255.0)*256;
-			gfx->Data[z] += (int)(datafield[2][z] * 255.0)*65536;
+			gfx->Data[z] += (int)(datafield[1][z] * 255.0) << 8;
+			gfx->Data[z] += (int)(datafield[2][z] * 255.0) << 16;
 		} else {
 			gfx->Data[z] = (int)(datafield[0][z] * datafield[4][z] * 255.0);
-			gfx->Data[z] += (int)(datafield[1][z] * datafield[4][z] * 255.0)*256;
-			gfx->Data[z] += (int)(datafield[2][z]  * datafield[4][z] * 255.0)*65536;
+			gfx->Data[z] += (int)(datafield[1][z] * datafield[4][z] * 255.0) << 8;
+			gfx->Data[z] += (int)(datafield[2][z]  * datafield[4][z] * 255.0) << 16;
 			gfx->Data[z] += (int)(datafield[1][z] * (1.0 - datafield[4][z]) * 255.0);
-			gfx->Data[z] += (int)(datafield[2][z] * (1.0 - datafield[4][z]) * 255.0)*256;
-			gfx->Data[z] += (int)(datafield[0][z]  * (1.0 - datafield[4][z]) * 255.0)*65536;
+			gfx->Data[z] += (int)(datafield[2][z] * (1.0 - datafield[4][z]) * 255.0) << 8;
+			gfx->Data[z] += (int)(datafield[0][z]  * (1.0 - datafield[4][z]) * 255.0) << 16;
 		}
 	}
 	return 0;
@@ -788,6 +802,7 @@ float c_sin(int a, float b) {
 		}
 		return sincache[a];
 	}
+
 	return 0.0;
 }
 
@@ -896,7 +911,7 @@ void Sinline_merge_datafields_mul(float *datafield, float *datafield1, float *da
 }
 
 
-int Generate_Sinline_Texture(struct GFX_DATA *gfx)
+int GFX_Generate_SinlineTexture(struct GFX_DATA *gfx)
 {
 	int z;
 	float *a, *datafield[5];
@@ -954,9 +969,12 @@ int Generate_Sinline_Texture(struct GFX_DATA *gfx)
 			free(datafield[z]);
 		free(gfx->Data);
 		gfx->Data = NULL;
-		if (verbose) printf("FAILED\n");
+		if (stereograph_verbose) printf("FAILED\n");
 		fprintf(stderr, "could not allocate memory;\n");
-		return -1;
+		return GFX_ERROR_MEMORY_PROBLEM;
 	}
+
 	return 0;
 }
+
+

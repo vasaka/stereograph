@@ -1,0 +1,25 @@
+# no need to change anything below here
+#----------------------------------------------------------
+
+SRC0 = stereograph.c renderer.c gfxio.c
+OBJ0 = stereograph.o renderer.o gfxio.o
+
+all: $(OBJ0) stereograph
+make: all
+
+stereograph: $(OBJ0)
+stereograph.o: stereograph.c stereograph.h renderer.h gfxio.h globals.h
+renderer.o: renderer.c renderer.h globals.h
+gfxio.o: gfxio.c gfxio.h renderer.h globals.h
+
+
+install:
+	cp stereograph /usr/local/bin/stereograph
+	cp stereograph.1 /usr/local/man/man1/stereograph.1
+
+clean:
+	rm -f $(OBJ0) stereograph core
+
+un-install:
+	rm /usr/local/bin/stereograph
+	rm /usr/local/man/man1/stereograph.1

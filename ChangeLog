@@ -1,0 +1,115 @@
+  2000-06-21  * file format auto sensing implemented;
+              * fixed floating point exception in the
+	        random texture generator;
+              * general code cleanups;
+              * release of 0.28a;
+
+  2000-06-19  * extended random texture generator and added an
+                experimental fix for big endidan machines;
+              * release 0.27b;
+
+  2000-06-18  * added an experimental artistic random texture
+                generator;
+              * release of 0.27a;
+
+  2000-06-17  * fixed segmentation fault related to argument list;
+              * release of 0.26.1
+
+  2000-06-09  * implemented base level adjustment;
+              * added option to the invert base;
+              * changed synopsis to define the
+                output format (including the constants);
+              * release 0.26
+
+  2000-06-06  * fixed right changemap 'black holes';
+              * release 0.25.1
+
+  2000-06-03  * added random texture generator
+              * reimplemented the anti-artefacts feature
+                and changed synopsis (be aware!);
+              * some renderer internal fixes;
+              * internally shifted some functions;
+              * fixed some minor bugs;
+              * release 0.25
+
+  2000-06-02  * added the -w argument to define a
+                constant texture width, very useful
+                for transparent stereograms and free
+                texture images;
+              * fixed triangle zoom
+              * release 0.24
+
+  2000-05-31  * added the -A flag (aid) which will
+                add a pair of black triangles to the image
+                to help the magic view of a stereogram;
+              * release 0.23
+
+  2000-05-29  * fixed starty parametre handling
+              * corrected internal renderer statics
+              * release 0.22
+
+  2000-05-28  * added linear rendering option
+              * changed constants due to GTKstereograph
+                which now includes the current renderer
+              * release 0.21
+
+  2000-05-23  * fixed segmentation fault in transparent
+                memory managment;
+              * fixed standard rendering input file problem
+              * release 0.20.1a
+
+  2000-05-21  * introduced transparent rendering,
+                standard rendering remains untouched;
+	      * in contrast to the single layer convention
+                for transparency the renderer does NOT
+                provide the application with internal gfx
+                pointers. that's due to the issue that
+                this great amount of memory shall not be
+                cleared up with clear_renderer;
+              * updated the readme, just for the case :)
+	      * release 0.20a
+
+  2000-05-11  * fixed png reading text output if verbose
+              * added the -V option to display version
+	      * finally added the man page from Peter Palfrader
+	      * updated install and uninstall script
+	      * release 0.19.1
+
+  2000-04-15  * added file format switch, adjusted arguments
+              * release 0.19
+
+  2000-04-14  * implemented ppm output, optional as file
+                or to stdout
+              * releasing 0.18
+
+  2000-04-13  * implemented png i/o filter
+              * release 0.17
+
+  2000-04-12  * finally added the verbosity flag and pipe
+                interaction via standard output.
+              * release 0.16
+
+  2000-04-10  * added experminental anti-artefacts feature
+              * release 0.15
+
+  2000-04-08  * fixed a minor bug in the aa implementation
+                including the aa-zoom implementation and
+                even zoom
+              * 0.14
+
+  2000-03-31  * changed renderer memory management to speed
+                up aa and zoom rendering
+              * extended the README
+              * release 0.13
+
+  2000-02-16  * fixed aa rounding problem in the two aa
+                rendering functions where the mem' is
+                flushed back
+              * setting up 0.12
+
+  2000-02-11  * added eye perspective argument -e
+              * releasing version 0.11
+
+  2000-02-08  * releasing version 0.10 into the playground
+                of the linux community. :)
+

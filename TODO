@@ -1,0 +1,7 @@
+  2000-06-03  * add the graphic format support you need;
+              * manage properly gfx input format autosensing;
+
+  2000-02-04  * add the graphic format support you need;
+              * manage a nice interface for everyone to use
+                (mere X, KDE, Gnome, whatever you want to);
+

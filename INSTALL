@@ -1,0 +1,16 @@
+The simplest way to compile this package is:
+
+  1. `cd' to the directory containing the package's source code.
+     (that's usually where this file is placed)
+
+  2. Type `make' to compile the package.
+
+  3. Type `make install' to install the program (usually as root)
+     Please notify: there's still no man page at the moment, please
+     take a look into the README.
+
+  4. You can remove the program binaries and object files from the
+     source code directory by typing `make clean'.
+
+  5. If necessary you can remove the binary that was installed in
+     step 3. into /usr/local/bin with the line `make un-install'.

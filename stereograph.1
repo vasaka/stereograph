@@ -1,0 +1,177 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" $Id: stereograph.1,v 1.1 2000/06/21 22:46:30 janoschs Exp $
+
+.TH STEREOGRAPH 1 "June 21, 2000"
+.\" Please adjust this date whenever revising the manpage.
+
+.SH NAME
+stereograph \- stereogram generator
+
+
+.SH SYNOPSIS
+.LP
+\fBstereograph\fP [\fIoptions\fP] -b \fIbase\fP [-t \fItexture\fP] [-o \fIoutput\fP]
+
+
+.SH DESCRIPTION
+
+Stereograph is a stereogram generator. In detail it is a single image
+stereogram (SIS) generator. It produces twodimensional images that
+seem to be threedimensional.
+
+\fIbase\fP is the file describung the \*(rqrelief\*(lq of the 3d
+model. It is a simple graphic where the brightness of a pixel defines
+its individual depth.  The darker a pixel is, the more far away it
+will seem to be in the final stereogram - the brighter it is, the
+closer it will be.
+.P
+The \fItexture\fP is that what everyone sees when regarding your stereogram
+\- even if he cannot get in the third dimensions of the composition.
+If you use the \fB-w\fP swich this becomes optional.
+.P
+The width of the texture stands for the maximum depth of any steregram
+and it cannot be greater than the distance of a viewer's two eyes -
+otherwise they won't be able to see anything in the stereogram but the
+beautiful great texture. As a hand rule, 100 should work nice for
+stereograms of 640*480 up to 800*600 pixels. Use 110 to 120 for
+greater ones.
+.P
+The files given as \fIbase\fP and \fItexture\fP must be supplied
+either in the tga or in the png format. Which you used is derived from
+the file name.
+.P
+\fIoutput\fP is the file where the stereogram is written to. The file
+format to use is deduced from the filename given if not overridden by
+\fB-f\fP. (\*rq.tga\*(lq, (\*rq.png\*(lq, and (\*rq.ppm\*(lq are
+supported. If not given, \fBstereograph\fP will write the image in PPM
+or the format given with \fB-f\fP format to the standard output.
+.P
+
+
+.SH OPTIONS
+
+.IP "\fB-v\fP"
+Be verbose.
+
+.IP "\fB-f\fP \fIoutputformat\fP"
+\fIoutputformat\fP is one of the following: tga, png, or ppm.
+
+.IP "\fB-A\fP"
+The Aid flag \fB-A\fP will add a pair of black triangles at the top of
+the stereogram to make it easier for unexperienced eyes to achieve the
+magic view.
+
+.SS "Quality controling arguments"
+
+.IP "\fB-a\fP \fIanti-aliasing\fP"
+\fIanti-aliasing\fP describes a value between 1 and 32 (4 is the
+default) that declares how many pixels shall be calculated by the
+renderer virtually for ONE pixel.
+.IP
+You can calculate easily: physically you habe n depth levels, where n
+is the width of the texture used for the stereogram. With the AA
+feature you now have theoretically a*n levels.  This feature increases
+_massively_ the color depth of the output file
+
+.IP "\fB-z\fP \fIzoom\fP"
+based on the same idea as AA and has the same effects but physically
+increases the file size. Values range from 1 (default) up to 32.
+
+.SS "perspective"
+
+.IP "\fB-d\fP \fIdistance\fP"
+\fIdistance\fP describes the distance of your eyes and the virtual
+glass that is between you and your stereogram. Allowed are values from
+0.0 up to 8.0 where 0.6 is the default.
+
+.IP "\fB-e\fP \fIeye\-shift\fP"
+\fIeye\-shift\fP (a value between -1.0 and 1.0) controls the
+perspective along the x axis (left to right). That is if e is positive
+the image is shifted slightly to the right. The default value of 0.0
+is exactly the centered perspective.
+
+
+.SS layout
+
+.IP "\fB-x\fP \fItexture\-insert\-x\fP"
+\fItexture\-insert\-x\fP is a value between 0 and the width of the
+\fItexture\fP controlling where the \fItexture\fP is inserted the
+first time and where the rendering process begins its round. default:
+0 (left image border).
+
+.IP "\fB-y\fP \fItexture\-insert\-y\fP"
+\fItexture\-insert\-y\fP is a value between 0 and the height of the
+\fItexture\fP controlling where the \fItexture\fP is inserted the
+first time and where the rendering process begins its round. default:
+0 (top image border).
+
+.IP "\fB-w\fP \fItexture\-width\fP"
+\fItexture\-width\fP specifies the texture width to use for the
+stereogram.  This option tells stereograph to generate a random
+texture or if a texture was defined it resizes the texture to match
+your dimension. Note that this can only reduce the width and
+stereograph doesn't care about image ratios. It just cuts your
+texture. Random textures cannot be used with transparent rendering.
+
+.IP "\fB-M\fP, \fB-G\fP, \fB-C\fP, \fB-S\fP"
+Use one of there flags to define which color type the random texture
+should conform to. Use \fB-M\fP for monochrome, \fB-G\fP for a
+grayscale or \fB-C\fP for a random color texture. Please note that the
+random texture feature cannot be combined with transparent rendering
+and that anti-aliasing increases the color depth of you image \- even
+if you use a monochrome texture. To disable anti\-aliasing use \fB-a
+1\fP.
+.IP
+The \fB-S\fP flag is experimental \- it generates an artistic random
+texture.
+
+.SS "base options"
+
+.IP "\fB-I\fP"
+inverts a base (non-transparent rendering only)
+
+.IP "\fB-l\fP (\fBnone\fP|\fBback\fP|\fBtop\fP)"
+adjusts the base levels for transparent rendering: the keyword
+\fBnone\fP keeps the defined height levels of the base images,
+\fBback\fP adjusts the bottom area of all upper layers to the level
+defined by the preceding layer and \fBtop\fP adjusts the areas of
+upper layers that are not as far as the preceeding layer to the level
+of the preceding layer.
+
+.IP "\fB-L\fP"
+disables linear rendering.
+
+.IP "\fB-R\fP"
+The anti-artefacts feature tells \fBstereograph\fP to process every
+second line in reversed order to prevent artefacts. This flag should
+be used only with random textures.
+
+.SS "transparancy"
+.IP "\fB-T\fP \fIn\fP"
+enables transparent stereograms where \fIn\fP is the number of
+transparent layers. You must provide stereograph with \fIn\fP+1 bases
+and \fIn\fP+1 textures. This option must PRECEED any other options!
+.IP
+Transparent stereograms are rendered in the same way as normal
+stereograms, the only difference for you is to define more than one
+input base file and provide respectively the same number of
+textures. The different bases must have the same dimensions, the
+textures must equal themselves in the width.
+
+
+.\" .SH "BUGS"
+
+
+.SH "SEE ALSO"
+\fI/usr/share/doc/stereograph/README\fP
+.SH AUTHOR
+\fBstereograph\fP has been written by Fabian Januszewski
+<fabian.linux@januszewski.de>.
+.P
+This manual page was written by Peter Palfrader
+<ppalfrad@cosy.sbg.ac.at> using large parts from the README file, for
+the Debian GNU/Linux system (but may be used by others).
+
+.SH "COMMENT"
+.P
+This manpage documents version 0.28a of \fBstereograph\fP.

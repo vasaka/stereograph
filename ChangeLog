@@ -1,6 +1,11 @@
+  2003-11-17    (J.-P. Demailly <demailly@fourier.ujf-grenoble.fr>)
+              * fix of a small segfault bug in gfxio.c concerning
+	        png loading;
+	      * release 0.33b;
+
   2003-11-16    (J.-P. Demailly <demailly@fourier.ujf-grenoble.fr>)
-              * added support for X11 output
-	      * added support for C script input (via dlopen() call)
+              * added support for X11 output;
+	      * added support for C script input (via dlopen() call);
 	      * release 0.33a;
 	      
   2003-10-18    (J.-P. Demailly <demailly@fourier.ujf-grenoble.fr>)

@@ -1,4 +1,4 @@
-/* Stereograph 0.33a, 16/11/2003;
+/* Stereograph 0.33b, 17/11/2003;
  * Graphics I/O functions;
  * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -905,12 +905,12 @@ int GFX_Read_PNG (FILE *ifile, unsigned char *check_header, struct GFX_DATA *gfx
 		
 		/* reduce from 16 bits/channel to 8 bits */
 			/* correct use of little endian */
-		if (bit_depth == 16) {
-		#if __BYTE_ORDER == __BIG_ENDIAN
-		  //png_set_swap(png_ptr);  // swap byte pairs to little endian
+		/* if (bit_depth == 16) { */
+		#if __BYTE_ORDER != __BIG_ENDIAN
+		png_set_swap(png_ptr);  // swap byte pairs to little endian
 		#endif
-		  //png_set_strip_16(png_ptr);
-		}
+		png_set_strip_16(png_ptr);
+		/* } */
 
 
 		/* if it's a gray scale, convert it to RGB */

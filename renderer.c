@@ -1,4 +1,4 @@
-/* Stereograph 0.33a, 16/11/2003;
+/* Stereograph 0.33b, 17/11/2003;
  * the renderer, stereographer's engine;
  * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *

@@ -1,4 +1,4 @@
-/* Stereograph 0.33a, 16/11/2003;
+/* Stereograph 0.33b, 17/11/2003;
  * a stereogram generator;
  * Copyright (c) 2000-2003 by Fabian Januszewski <fabian.linux@januszewski.de>
  *
@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define STEREOGRAPH_VERSION "0.33a"
+#define STEREOGRAPH_VERSION "0.33b"
 
 #include "renderer.h"
 #include "gfxio.h"
